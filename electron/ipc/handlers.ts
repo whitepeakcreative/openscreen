@@ -40,6 +40,7 @@ import { RECORDINGS_DIR } from "../main";
 import { createCursorRecordingSession } from "../native-bridge/cursor/recording/factory";
 import { requestMacCursorAccessibilityAccess } from "../native-bridge/cursor/recording/macNativeCursorRecordingSession";
 import type { CursorRecordingSession } from "../native-bridge/cursor/recording/session";
+import { TelemetryRecordingSession } from "../native-bridge/cursor/recording/telemetryRecordingSession";
 import { patchWebmDurationOnDisk } from "../recording/webm-duration";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
 import { RecordingStreamRegistry, registerRecordingStreamHandlers } from "./recordingStream";
@@ -803,6 +804,23 @@ async function startCursorRecording(recordingId?: number) {
 	} catch (error) {
 		console.error("Failed to start cursor recording session:", error);
 		cursorRecordingSession = null;
+
+		if (process.platform === "win32") {
+			console.info("Falling back to telemetry-based cursor recording (native helper unavailable)");
+			cursorRecordingSession = new TelemetryRecordingSession({
+				getDisplayBounds: getSelectedSourceBounds,
+				maxSamples: MAX_CURSOR_SAMPLES,
+				sampleIntervalMs: CURSOR_SAMPLE_INTERVAL_MS,
+				startTimeMs:
+					typeof recordingId === "number" && Number.isFinite(recordingId) ? recordingId : undefined,
+			});
+			try {
+				await cursorRecordingSession.start();
+			} catch (fallbackError) {
+				console.error("Failed to start fallback telemetry cursor recording:", fallbackError);
+				cursorRecordingSession = null;
+			}
+		}
 	}
 }
 
