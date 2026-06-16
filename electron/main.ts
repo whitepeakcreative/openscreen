@@ -507,7 +507,9 @@ app.whenReady().then(async () => {
 
 			callback({
 				video: source,
-				...(request.audioRequested && process.platform === "win32" ? { audio: "loopback" } : {}),
+				...(request.audioRequested && (process.platform === "win32" || process.platform === "linux")
+					? { audio: "loopback" }
+					: {}),
 			});
 		},
 		{ useSystemPicker: false },

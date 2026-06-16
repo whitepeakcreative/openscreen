@@ -1154,7 +1154,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			let screenMediaStream: MediaStream;
 			const platform = await window.electronAPI.getPlatform();
 
-			if (platform === "win32") {
+			if (platform === "win32" || platform === "linux") {
 				// getDisplayMedia + setDisplayMediaRequestHandler (main.ts) supplies the
 				// pre-selected source. Editable cursor mode excludes the system cursor so
 				// the editor can render a replacement; system mode bakes it into the video.
