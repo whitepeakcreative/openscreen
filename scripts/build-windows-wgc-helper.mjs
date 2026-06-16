@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -18,13 +18,53 @@ function findVcVarsAll() {
 		return explicit;
 	}
 
+	// Use vswhere.exe (official Microsoft tool, bundled with VS) to locate VS installations.
+	const vswherePaths = [
+		`${process.env["ProgramFiles(x86)"]}\\Microsoft Visual Studio\\Installer\\vswhere.exe`,
+		`${process.env.ProgramFiles}\\Microsoft Visual Studio\\Installer\\vswhere.exe`,
+	];
+
+	for (const vswhere of vswherePaths) {
+		if (!fs.existsSync(vswhere)) {
+			continue;
+		}
+
+		try {
+			const result = spawnSync(vswhere, [
+				"-latest",
+				"-requires",
+				"Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+				"-property",
+				"installationPath",
+				"-format",
+				"value",
+			]);
+
+			const installPath = result.stdout?.toString().trim();
+			if (installPath) {
+				const candidate = path.join(installPath, "VC", "Auxiliary", "Build", "vcvarsall.bat");
+				if (fs.existsSync(candidate)) {
+					return candidate;
+				}
+			}
+		} catch {
+			// Fall through to manual search below.
+		}
+	}
+
+	// Manual fallback: check common install locations.
 	const roots = [
 		process.env.VSINSTALLDIR,
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community",
-		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional",
 		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise",
+		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional",
+		"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community",
+		"C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools",
 		"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools",
 		"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Community",
+		"C:\\Program Files\\Microsoft Visual Studio\\2019\\Enterprise",
+		"C:\\Program Files\\Microsoft Visual Studio\\2019\\Professional",
+		"C:\\Program Files\\Microsoft Visual Studio\\2019\\Community",
+		"C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools",
 	];
 
 	for (const root of roots.filter(Boolean)) {

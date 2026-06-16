@@ -48,7 +48,7 @@ async function exists(filePath) {
 	}
 }
 
-const MAX_ATTEMPTS = 6;
+const MAX_ATTEMPTS = 10;
 // HuggingFace rate-limits (429) when the parallel CI matrix builds all hit it at once; also retry the
 // usual transient server errors.
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
