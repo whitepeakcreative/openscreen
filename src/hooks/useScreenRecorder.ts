@@ -1154,10 +1154,12 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			let screenMediaStream: MediaStream;
 			const platform = await window.electronAPI.getPlatform();
 
-			if (platform === "win32" || platform === "linux") {
+			if (platform === "win32") {
 				// getDisplayMedia + setDisplayMediaRequestHandler (main.ts) supplies the
-				// pre-selected source. Editable cursor mode excludes the system cursor so
-				// the editor can render a replacement; system mode bakes it into the video.
+				// pre-selected source. Note: cursor: "never" is not implemented by
+				// Chromium (issues #41456762, #394133543), so the native OS cursor
+				// remains visible in the captured video unless the WGC native helper
+				// is available (uses IsCursorCaptureEnabled(false) at the OS level).
 				screenMediaStream = await navigator.mediaDevices.getDisplayMedia({
 					video: {
 						cursor: cursorCaptureMode === "editable-overlay" ? "never" : "always",
