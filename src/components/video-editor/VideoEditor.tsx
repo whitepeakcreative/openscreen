@@ -111,6 +111,14 @@ import {
 	type ZoomFocus,
 	type ZoomFocusMode,
 	type ZoomRegion,
+	type WebcamZoomRegion,
+	type WebcamTakeoverRegion,
+	type WebcamZoomScale,
+	type WebcamTakeoverTransition,
+	DEFAULT_WEBCAM_ZOOM_SCALE,
+	DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
 } from "./types";
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog";
 import VideoPlayback, { VideoPlaybackRef } from "./VideoPlayback";
@@ -209,6 +217,8 @@ export default function VideoEditor() {
 		webcamReactiveZoom,
 		webcamSizePreset,
 		webcamPosition,
+		webcamZoomRegions,
+		webcamTakeoverRegions,
 	} = editorState;
 
 	// Non-undoable state
@@ -232,6 +242,8 @@ export default function VideoEditor() {
 	const [selectedSpeedId, setSelectedSpeedId] = useState<string | null>(null);
 	const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
 	const [selectedBlurId, setSelectedBlurId] = useState<string | null>(null);
+	const [selectedWebcamZoomId, setSelectedWebcamZoomId] = useState<string | null>(null);
+	const [selectedWebcamTakeoverId, setSelectedWebcamTakeoverId] = useState<string | null>(null);
 	const [isExporting, setIsExporting] = useState(false);
 	const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 	const [exportError, setExportError] = useState<string | null>(null);
@@ -299,6 +311,8 @@ export default function VideoEditor() {
 	const nextZoomIdRef = useRef(1);
 	const nextTrimIdRef = useRef(1);
 	const nextSpeedIdRef = useRef(1);
+	const nextWebcamZoomIdRef = useRef(1);
+	const nextWebcamTakeoverIdRef = useRef(1);
 
 	const { shortcuts, isMac } = useShortcuts();
 	// Windows recordings include captured cursor assets. macOS hides the system
