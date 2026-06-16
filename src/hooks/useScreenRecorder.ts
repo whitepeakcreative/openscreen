@@ -1154,12 +1154,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			let screenMediaStream: MediaStream;
 			const platform = await window.electronAPI.getPlatform();
 
-			if (platform === "win32") {
+			if (platform === "win32" || platform === "linux") {
 				// getDisplayMedia + setDisplayMediaRequestHandler (main.ts) supplies the
-				// pre-selected source. Note: cursor: "never" is not implemented by
-				// Chromium (issues #41456762, #394133543), so the native OS cursor
-				// remains visible in the captured video unless the WGC native helper
-				// is available (uses IsCursorCaptureEnabled(false) at the OS level).
+				// pre-selected source. On Windows, cursor: "never" is not implemented by
+				// Chromium (issues #41456762, #394133543) — the WGC native helper with
+				// IsCursorCaptureEnabled(false) is the only reliable way to suppress the
+				// cursor. On Linux Wayland, PipeWire's backend may honor cursor: "never"
+				// via the native cursor_mode=hidden portal setting (needs testing).
 				screenMediaStream = await navigator.mediaDevices.getDisplayMedia({
 					video: {
 						cursor: cursorCaptureMode === "editable-overlay" ? "never" : "always",
