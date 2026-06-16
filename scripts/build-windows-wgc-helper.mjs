@@ -111,6 +111,17 @@ if (process.platform !== "win32") {
 
 fs.mkdirSync(BUILD_DIR, { recursive: true });
 
+// If Visual Studio Build Tools are not installed, skip the native helper build.
+// The app will still function for all features except native cursor recording on Windows.
+// WebRTC-based recordings (including cursor telemetry) will work without the helper.
+const vcvarsAll = findVcVarsAll();
+if (!vcvarsAll) {
+	console.log("WARNING: Visual Studio Build Tools not found. Skipping WGC helper build.");
+	console.log("Native cursor recording will not be available on Windows.");
+	console.log("To enable native cursor recording, install Visual Studio Build Tools with C++.");
+	process.exit(0);
+}
+
 await runInVsEnv(
 	`"${CMAKE}" -S "${SOURCE_DIR}" -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release`,
 );

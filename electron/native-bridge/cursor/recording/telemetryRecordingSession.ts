@@ -54,6 +54,7 @@ export class TelemetryRecordingSession implements CursorRecordingSession {
 			cx: clamp((cursor.x - display.x) / width, 0, 1),
 			cy: clamp((cursor.y - display.y) / height, 0, 1),
 			visible: true,
+			cursorType: "arrow",
 		});
 
 		if (this.samples.length > this.options.maxSamples) {
