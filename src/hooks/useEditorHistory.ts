@@ -13,6 +13,8 @@ import type {
 	WebcamMaskShape,
 	WebcamPosition,
 	WebcamSizePreset,
+	WebcamTakeoverRegion,
+	WebcamZoomRegion,
 	ZoomRegion,
 } from "@/components/video-editor/types";
 import {
@@ -49,6 +51,8 @@ export interface EditorState {
 	webcamReactiveZoom: boolean;
 	webcamSizePreset: WebcamSizePreset;
 	webcamPosition: WebcamPosition | null;
+	webcamZoomRegions: WebcamZoomRegion[];
+	webcamTakeoverRegions: WebcamTakeoverRegion[];
 }
 
 export const INITIAL_EDITOR_STATE: EditorState = {
@@ -73,6 +77,8 @@ export const INITIAL_EDITOR_STATE: EditorState = {
 	webcamReactiveZoom: DEFAULT_WEBCAM_REACTIVE_ZOOM,
 	webcamSizePreset: DEFAULT_WEBCAM_SETTINGS.sizePreset,
 	webcamPosition: DEFAULT_WEBCAM_SETTINGS.position,
+	webcamZoomRegions: [],
+	webcamTakeoverRegions: [],
 };
 
 type StateUpdate = Partial<EditorState> | ((prev: EditorState) => Partial<EditorState>);

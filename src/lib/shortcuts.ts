@@ -6,6 +6,8 @@ export const SHORTCUT_ACTIONS = [
 	"addAnnotation",
 	"addBlur",
 	"addKeyframe",
+	"addWebcamZoom",
+	"addWebcamTakeover",
 	"deleteSelected",
 	"playPause",
 ] as const;
@@ -113,6 +115,8 @@ export const DEFAULT_SHORTCUTS: ShortcutsConfig = {
 	addAnnotation: { key: "a" },
 	addBlur: { key: "b" },
 	addKeyframe: { key: "f" },
+	addWebcamZoom: { key: "w" },
+	addWebcamTakeover: { key: "k" },
 	deleteSelected: { key: "d", ctrl: true },
 	playPause: { key: " " },
 };
@@ -125,6 +129,8 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
 	addAnnotation: "Add Annotation",
 	addBlur: "Add Blur",
 	addKeyframe: "Add Keyframe",
+	addWebcamZoom: "Add Cam Zoom",
+	addWebcamTakeover: "Add Cam Takeover",
 	deleteSelected: "Delete Selected",
 	playPause: "Play / Pause",
 };

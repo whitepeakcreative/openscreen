@@ -28,6 +28,10 @@ import {
 	DEFAULT_PLAYBACK_SPEED,
 	DEFAULT_WEBCAM_MIRRORED,
 	DEFAULT_WEBCAM_REACTIVE_ZOOM,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
+	DEFAULT_WEBCAM_ZOOM_SCALE,
+	DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
 	DEFAULT_ZOOM_DEPTH,
 	DEFAULT_ZOOM_MOTION_BLUR,
 	MAX_BLUR_BLOCK_SIZE,
@@ -42,6 +46,8 @@ import {
 	type WebcamMaskShape,
 	type WebcamPosition,
 	type WebcamSizePreset,
+	type WebcamTakeoverRegion,
+	type WebcamZoomRegion,
 	type ZoomRegion,
 } from "./types";
 
@@ -86,6 +92,8 @@ export interface ProjectEditorState {
 	webcamReactiveZoom: boolean;
 	webcamSizePreset: WebcamSizePreset;
 	webcamPosition: WebcamPosition | null;
+	webcamZoomRegions: WebcamZoomRegion[];
+	webcamTakeoverRegions: WebcamTakeoverRegion[];
 	exportQuality: ExportQuality;
 	exportFormat: ExportFormat;
 	gifFrameRate: GifFrameRate;
@@ -511,6 +519,28 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 				? Math.max(10, Math.min(50, editor.webcamSizePreset))
 				: DEFAULT_WEBCAM_SETTINGS.sizePreset,
 		webcamPosition: normalizedWebcamPosition,
+		webcamZoomRegions: Array.isArray(editor.webcamZoomRegions)
+			? editor.webcamZoomRegions
+					.filter((r): r is WebcamZoomRegion => Boolean(r && typeof r.id === "string"))
+					.map((r) => ({
+						id: r.id,
+						startMs: Math.max(0, isFiniteNumber(r.startMs) ? Math.round(r.startMs) : 0),
+						endMs: Math.max(1, isFiniteNumber(r.endMs) ? Math.round(r.endMs) : 1000),
+						scale: [1.5, 2, 2.5, 3, 4].includes(r.scale) ? r.scale : DEFAULT_WEBCAM_ZOOM_SCALE,
+						transitionDurationMs: isFiniteNumber(r.transitionDurationMs) ? Math.max(0, r.transitionDurationMs) : DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
+					}))
+			: [],
+		webcamTakeoverRegions: Array.isArray(editor.webcamTakeoverRegions)
+			? editor.webcamTakeoverRegions
+					.filter((r): r is WebcamTakeoverRegion => Boolean(r && typeof r.id === "string"))
+					.map((r) => ({
+						id: r.id,
+						startMs: Math.max(0, isFiniteNumber(r.startMs) ? Math.round(r.startMs) : 0),
+						endMs: Math.max(1, isFiniteNumber(r.endMs) ? Math.round(r.endMs) : 1000),
+						transition: ["zoom", "blur-zoom"].includes(r.transition) ? r.transition : DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+						transitionDurationMs: isFiniteNumber(r.transitionDurationMs) ? Math.max(0, r.transitionDurationMs) : DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
+					}))
+			: [],
 		exportQuality:
 			editor.exportQuality === "medium" || editor.exportQuality === "source"
 				? editor.exportQuality

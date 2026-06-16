@@ -1,6 +1,6 @@
 import { getAssetPath } from "@/lib/assetPath";
 
-export const WALLPAPER_COUNT = 18;
+export const WALLPAPER_COUNT = 2;
 
 export const WALLPAPER_PATHS: readonly string[] = Array.from(
 	{ length: WALLPAPER_COUNT },

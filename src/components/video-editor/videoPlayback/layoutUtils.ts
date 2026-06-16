@@ -33,6 +33,7 @@ interface LayoutResult {
 	baseOffset: { x: number; y: number };
 	maskRect: RenderRect;
 	maskBorderRadius: number;
+	screenRect: RenderRect;
 	webcamRect: StyledRenderRect | null;
 	cropBounds: { startX: number; endX: number; startY: number; endY: number };
 }
@@ -149,6 +150,7 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
 		maskRect: compositeLayout.screenRect,
 		maskBorderRadius:
 			compositeLayout.screenBorderRadius ?? (compositeLayout.screenCover ? 0 : borderRadius),
+		screenRect: compositeLayout.screenRect,
 		webcamRect: compositeLayout.webcamRect,
 		cropBounds: { startX: cropStartX, endX: cropEndX, startY: cropStartY, endY: cropEndY },
 	};

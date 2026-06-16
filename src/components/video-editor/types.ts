@@ -431,3 +431,33 @@ function clamp(value: number, min: number, max: number) {
 	if (Number.isNaN(value)) return (min + max) / 2;
 	return Math.min(max, Math.max(min, value));
 }
+
+export type WebcamZoomScale = 1.5 | 2 | 2.5 | 3 | 4;
+
+export const WEBCAM_ZOOM_SCALE_OPTIONS: WebcamZoomScale[] = [1.5, 2, 2.5, 3, 4];
+
+export interface WebcamZoomRegion {
+	id: string;
+	startMs: number;
+	endMs: number;
+	scale: WebcamZoomScale;
+	transitionDurationMs: number;
+}
+
+export const DEFAULT_WEBCAM_ZOOM_SCALE: WebcamZoomScale = 2;
+export const DEFAULT_WEBCAM_ZOOM_TRANSITION_MS = 300;
+
+export type WebcamTakeoverTransition = "zoom" | "blur-zoom";
+
+export const WEBCAM_TAKEOVER_TRANSITION_OPTIONS: WebcamTakeoverTransition[] = ["zoom", "blur-zoom"];
+
+export interface WebcamTakeoverRegion {
+	id: string;
+	startMs: number;
+	endMs: number;
+	transition: WebcamTakeoverTransition;
+	transitionDurationMs: number;
+}
+
+export const DEFAULT_WEBCAM_TAKEOVER_TRANSITION: WebcamTakeoverTransition = "zoom";
+export const DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS = 400;

@@ -1,5 +1,20 @@
+# 🎬 Sesh.fm Custom Build
+
+> This is a **custom fork of [OpenScreen](https://github.com/siddharthvaddem/openscreen)** tailored for **[Sesh.fm](https://sesh.fm)** by White Peak Creative.
+
+### What's different from upstream OpenScreen
+
+- **Webcam Zoom** — Timeline regions to zoom the webcam feed (1.5x–4x) with configurable transition speed
+- **Webcam Takeover** — Timeline regions where the webcam expands to fill the screen with zoom or blur-zoom transition styles
+- **Custom Branded Backgrounds** — Stock wallpapers replaced with Sesh.fm-branded backgrounds
+- **Windows AMD/Hybrid GPU Fix** — Forces discrete GPU on Windows machines with hybrid graphics
+- **Custom Gradient Builder** — Build and apply custom CSS gradients as backgrounds
+- **Keyboard Shortcuts** — `W` for webcam zoom, `K` for webcam takeover
+
+---
+
 > [!WARNING]
-> This started as a side project that blew up; not production grade and you'll hit bugs, but hopefully it covers what you need. **This project will soon be archived.**
+> This started as a side project that blew up; not production grade and you'll hit bugs, but hopefully it covers what you need.
 
 
 <p align="center">
