@@ -23,7 +23,9 @@
 		"addBlur": "ぼかしを追加",
 		"addKeyframe": "キーフレームを追加",
 		"deleteSelected": "選択を削除",
-		"playPause": "再生 / 一時停止"
+		"playPause": "再生 / 一時停止",
+		"addWebcamZoom": "カメラズームを追加",
+		"addWebcamTakeover": "カメラ切り替えを追加"
 	},
 	"fixedActions": {
 		"undo": "元に戻す",

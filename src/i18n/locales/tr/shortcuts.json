@@ -23,7 +23,9 @@
 		"addBlur": "Bulanik Ekle",
 		"addKeyframe": "Anahtar Kare Ekle",
 		"deleteSelected": "Seçileni Sil",
-		"playPause": "Oynat / Duraklat"
+		"playPause": "Oynat / Duraklat",
+		"addWebcamZoom": "Kamera Yakınlaştırma Ekle",
+		"addWebcamTakeover": "Kamera Devralma Ekle"
 	},
 	"fixedActions": {
 		"undo": "Geri Al",

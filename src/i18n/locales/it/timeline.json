@@ -12,7 +12,9 @@
 		"pressTrim": "Premi T per aggiungere taglio",
 		"pressAnnotation": "Premi A per aggiungere annotazione",
 		"pressBlur": "Premi B per aggiungere regione sfocatura",
-		"pressSpeed": "Premi S per aggiungere velocità"
+		"pressSpeed": "Premi S per aggiungere velocità",
+		"pressWebcamZoom": "Premi W per aggiungere zoom fotocamera",
+		"pressWebcamTakeover": "Premi K per aggiungere takeover fotocamera"
 	},
 	"labels": {
 		"pan": "Panoramica",

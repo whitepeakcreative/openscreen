@@ -82,6 +82,8 @@ import type {
 	WebcamLayoutPreset,
 	WebcamMaskShape,
 	WebcamSizePreset,
+	WebcamTakeoverTransition,
+	WebcamZoomScale,
 	ZoomDepth,
 	ZoomFocus,
 	ZoomFocusMode,
@@ -93,6 +95,8 @@ import {
 	MIN_ZOOM_SCALE,
 	ROTATION_3D_PRESET_ORDER,
 	SPEED_OPTIONS,
+	WEBCAM_TAKEOVER_TRANSITION_OPTIONS,
+	WEBCAM_ZOOM_SCALE_OPTIONS,
 	ZOOM_DEPTH_SCALES,
 } from "./types";
 import { getFocusBoundsForScale } from "./videoPlayback/focusUtils";
@@ -348,6 +352,18 @@ interface SettingsPanelProps {
 	onCursorThemeChange?: (theme: string) => void;
 	hasCursorData?: boolean;
 	showCursorSettings?: boolean;
+	selectedWebcamZoomId?: string | null;
+	selectedWebcamZoomScale?: WebcamZoomScale | null;
+	onWebcamZoomScaleChange?: (scale: WebcamZoomScale) => void;
+	selectedWebcamZoomTransitionDuration?: number | null;
+	onWebcamZoomDurationChange?: (ms: number) => void;
+	onWebcamZoomDelete?: (id: string) => void;
+	selectedWebcamTakeoverId?: string | null;
+	selectedWebcamTakeoverTransition?: WebcamTakeoverTransition | null;
+	onWebcamTakeoverTransitionChange?: (t: WebcamTakeoverTransition) => void;
+	selectedWebcamTakeoverDuration?: number | null;
+	onWebcamTakeoverDurationChange?: (ms: number) => void;
+	onWebcamTakeoverDelete?: (id: string) => void;
 }
 
 export default SettingsPanel;
@@ -484,6 +500,18 @@ export function SettingsPanel({
 	onCursorThemeChange,
 	hasCursorData = false,
 	showCursorSettings = true,
+	selectedWebcamZoomId,
+	selectedWebcamZoomScale,
+	onWebcamZoomScaleChange,
+	selectedWebcamZoomTransitionDuration,
+	onWebcamZoomDurationChange,
+	onWebcamZoomDelete,
+	selectedWebcamTakeoverId,
+	selectedWebcamTakeoverTransition,
+	onWebcamTakeoverTransitionChange,
+	selectedWebcamTakeoverDuration,
+	onWebcamTakeoverDurationChange,
+	onWebcamTakeoverDelete,
 }: SettingsPanelProps) {
 	const t = useScopedT("settings");
 	const [activePanelMode, setActivePanelMode] = useState<SettingsPanelMode>("background");
@@ -1236,6 +1264,141 @@ export function SettingsPanel({
 									{t("speed.deleteRegion")}
 								</Button>
 							)}
+						</div>
+					)}
+
+					{selectedWebcamZoomId && (
+						<div className="mb-3 space-y-3 px-1">
+							<div className="flex items-center justify-between">
+								<span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+									Cam Zoom
+								</span>
+								{selectedWebcamZoomScale != null && (
+									<span className="rounded-full border border-[#34B27B]/25 bg-[#34B27B]/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#34B27B]">
+										{selectedWebcamZoomScale}×
+									</span>
+								)}
+							</div>
+							<div className="grid grid-cols-5 gap-1">
+								{WEBCAM_ZOOM_SCALE_OPTIONS.map((s) => (
+									<Button
+										key={s}
+										type="button"
+										onClick={() => onWebcamZoomScaleChange?.(s)}
+										className={cn(
+											"h-8 w-full rounded-lg border px-1 text-center transition-all duration-150 ease-out cursor-pointer",
+											selectedWebcamZoomScale === s
+												? "border-[#34B27B]/70 bg-[#34B27B] text-white shadow-[0_8px_20px_rgba(52,178,123,0.18)]"
+												: "border-white/[0.06] bg-white/[0.035] text-slate-400 hover:bg-white/[0.075] hover:border-white/15 hover:text-slate-200",
+										)}
+									>
+										<span className="text-[11px] font-semibold">{s}×</span>
+									</Button>
+								))}
+							</div>
+							<div>
+								<span className="text-[11px] font-medium text-slate-400 mb-1.5 block">
+									Transition Speed
+								</span>
+								<div className="grid grid-cols-2 gap-1.5">
+									{[
+										{ label: "Instant", ms: 0 },
+										{ label: "Fast", ms: 200 },
+										{ label: "Smooth", ms: 500 },
+										{ label: "Lazy", ms: 1200 },
+									].map((opt) => (
+										<Button
+											key={opt.label}
+											type="button"
+											onClick={() => onWebcamZoomDurationChange?.(opt.ms)}
+											className={cn(
+												"h-7 w-full rounded-md border px-1 text-center transition-all duration-150 ease-out cursor-pointer",
+												selectedWebcamZoomTransitionDuration === opt.ms
+													? "border-[#34B27B]/50 bg-[#34B27B] text-white"
+													: "border-white/[0.06] bg-white/[0.035] text-slate-400 hover:bg-white/[0.075] hover:border-white/15 hover:text-slate-200",
+											)}
+										>
+											<span className="text-[10px] font-semibold">{opt.label}</span>
+										</Button>
+									))}
+								</div>
+							</div>
+							<Button
+								onClick={() => onWebcamZoomDelete?.(selectedWebcamZoomId)}
+								variant="destructive"
+								size="sm"
+								className="w-full gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 transition-all h-8 text-xs"
+							>
+								<Trash2 className="w-3 h-3" />
+								Delete Cam Zoom
+							</Button>
+						</div>
+					)}
+
+					{selectedWebcamTakeoverId && (
+						<div className="mb-3 space-y-3 px-1">
+							<span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 block">
+								Cam Takeover
+							</span>
+							<div>
+								<span className="text-[11px] font-medium text-slate-400 mb-1.5 block">
+									Transition Style
+								</span>
+								<div className="grid grid-cols-2 gap-1.5">
+									{WEBCAM_TAKEOVER_TRANSITION_OPTIONS.map((tr) => (
+										<Button
+											key={tr}
+											type="button"
+											onClick={() => onWebcamTakeoverTransitionChange?.(tr)}
+											className={cn(
+												"h-7 w-full rounded-md border px-1 text-center transition-all duration-150 ease-out cursor-pointer",
+												selectedWebcamTakeoverTransition === tr
+													? "border-[#a78bfa]/50 bg-[#a78bfa] text-white"
+													: "border-white/[0.06] bg-white/[0.035] text-slate-400 hover:bg-white/[0.075] hover:border-white/15 hover:text-slate-200",
+											)}
+										>
+											<span className="text-[10px] font-semibold capitalize">
+												{tr === "blur-zoom" ? "Blur + Zoom" : "Zoom"}
+											</span>
+										</Button>
+									))}
+								</div>
+							</div>
+							<div>
+								<span className="text-[11px] font-medium text-slate-400 mb-1.5 block">
+									Transition Speed
+								</span>
+								<div className="grid grid-cols-3 gap-1.5">
+									{[
+										{ label: "Fast", ms: 200 },
+										{ label: "Normal", ms: 400 },
+										{ label: "Slow", ms: 800 },
+									].map((opt) => (
+										<Button
+											key={opt.label}
+											type="button"
+											onClick={() => onWebcamTakeoverDurationChange?.(opt.ms)}
+											className={cn(
+												"h-7 w-full rounded-md border px-1 text-center transition-all duration-150 ease-out cursor-pointer",
+												selectedWebcamTakeoverDuration === opt.ms
+													? "border-[#a78bfa]/50 bg-[#a78bfa] text-white"
+													: "border-white/[0.06] bg-white/[0.035] text-slate-400 hover:bg-white/[0.075] hover:border-white/15 hover:text-slate-200",
+											)}
+										>
+											<span className="text-[10px] font-semibold">{opt.label}</span>
+										</Button>
+									))}
+								</div>
+							</div>
+							<Button
+								onClick={() => onWebcamTakeoverDelete?.(selectedWebcamTakeoverId)}
+								variant="destructive"
+								size="sm"
+								className="w-full gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 transition-all h-8 text-xs"
+							>
+								<Trash2 className="w-3 h-3" />
+								Delete Takeover
+							</Button>
 						</div>
 					)}
 

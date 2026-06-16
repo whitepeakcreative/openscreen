@@ -23,7 +23,9 @@
 		"addBlur": "Добавить размытие",
 		"addKeyframe": "Добавить ключевой кадр",
 		"deleteSelected": "Удалить выбранное",
-		"playPause": "Воспроизведение / Пауза"
+		"playPause": "Воспроизведение / Пауза",
+		"addWebcamZoom": "Добавить зум камеры",
+		"addWebcamTakeover": "Добавить перехват камеры"
 	},
 	"fixedActions": {
 		"undo": "Отменить",

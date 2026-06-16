@@ -100,25 +100,25 @@ import {
 	DEFAULT_BLUR_DATA,
 	DEFAULT_FIGURE_DATA,
 	DEFAULT_PLAYBACK_SPEED,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+	DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
+	DEFAULT_WEBCAM_ZOOM_SCALE,
+	DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
 	DEFAULT_ZOOM_DEPTH,
 	type FigureData,
 	type PlaybackSpeed,
 	type Rotation3DPreset,
 	type SpeedRegion,
 	type TrimRegion,
+	type WebcamTakeoverRegion,
+	type WebcamTakeoverTransition,
+	type WebcamZoomRegion,
+	type WebcamZoomScale,
 	ZOOM_DEPTH_SCALES,
 	type ZoomDepth,
 	type ZoomFocus,
 	type ZoomFocusMode,
 	type ZoomRegion,
-	type WebcamZoomRegion,
-	type WebcamTakeoverRegion,
-	type WebcamZoomScale,
-	type WebcamTakeoverTransition,
-	DEFAULT_WEBCAM_ZOOM_SCALE,
-	DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
-	DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
-	DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
 } from "./types";
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog";
 import VideoPlayback, { VideoPlaybackRef } from "./VideoPlayback";
@@ -434,6 +434,8 @@ export default function VideoEditor() {
 				webcamReactiveZoom: normalizedEditor.webcamReactiveZoom,
 				webcamSizePreset: normalizedEditor.webcamSizePreset,
 				webcamPosition: normalizedEditor.webcamPosition,
+				webcamZoomRegions: normalizedEditor.webcamZoomRegions,
+				webcamTakeoverRegions: normalizedEditor.webcamTakeoverRegions,
 			});
 			setExportQuality(normalizedEditor.exportQuality);
 			setExportFormat(normalizedEditor.exportFormat);
@@ -469,6 +471,14 @@ export default function VideoEditor() {
 					(max, region) => Math.max(max, region.zIndex),
 					0,
 				) + 1;
+			nextWebcamZoomIdRef.current = deriveNextId(
+				"webcam-zoom",
+				normalizedEditor.webcamZoomRegions.map((region) => region.id),
+			);
+			nextWebcamTakeoverIdRef.current = deriveNextId(
+				"webcam-takeover",
+				normalizedEditor.webcamTakeoverRegions.map((region) => region.id),
+			);
 
 			setLastSavedSnapshot(
 				createProjectSnapshot(
@@ -511,6 +521,8 @@ export default function VideoEditor() {
 			webcamReactiveZoom,
 			webcamSizePreset,
 			webcamPosition,
+			webcamZoomRegions,
+			webcamTakeoverRegions,
 			exportQuality,
 			exportFormat,
 			gifFrameRate,
@@ -542,6 +554,8 @@ export default function VideoEditor() {
 		webcamReactiveZoom,
 		webcamSizePreset,
 		webcamPosition,
+		webcamZoomRegions,
+		webcamTakeoverRegions,
 		exportQuality,
 		exportFormat,
 		gifFrameRate,
@@ -670,6 +684,8 @@ export default function VideoEditor() {
 				webcamReactiveZoom,
 				webcamSizePreset,
 				webcamPosition,
+				webcamZoomRegions,
+				webcamTakeoverRegions,
 				exportQuality,
 				exportFormat,
 				gifFrameRate,
@@ -735,6 +751,8 @@ export default function VideoEditor() {
 			webcamReactiveZoom,
 			webcamSizePreset,
 			webcamPosition,
+			webcamZoomRegions,
+			webcamTakeoverRegions,
 			exportQuality,
 			exportFormat,
 			gifFrameRate,
@@ -864,6 +882,8 @@ export default function VideoEditor() {
 		setSelectedSpeedId(null);
 		setSelectedAnnotationId(null);
 		setSelectedBlurId(null);
+		setSelectedWebcamZoomId(null);
+		setSelectedWebcamTakeoverId(null);
 		// Reset playback.
 		setCurrentTime(0);
 		setIsPlaying(false);
@@ -881,6 +901,8 @@ export default function VideoEditor() {
 		nextSpeedIdRef.current = 1;
 		nextAnnotationIdRef.current = 1;
 		nextAnnotationZIndexRef.current = 1;
+		nextWebcamZoomIdRef.current = 1;
+		nextWebcamTakeoverIdRef.current = 1;
 	}, [resetState]);
 
 	const handleNewProject = useCallback(async () => {
@@ -991,6 +1013,8 @@ export default function VideoEditor() {
 			setSelectedSpeedId(null);
 			setSelectedAnnotationId(null);
 			setSelectedBlurId(null);
+			setSelectedWebcamZoomId(null);
+			setSelectedWebcamTakeoverId(null);
 		}
 	}, []);
 
@@ -1001,6 +1025,8 @@ export default function VideoEditor() {
 			setSelectedSpeedId(null);
 			setSelectedAnnotationId(null);
 			setSelectedBlurId(null);
+			setSelectedWebcamZoomId(null);
+			setSelectedWebcamTakeoverId(null);
 		}
 	}, []);
 
@@ -1011,6 +1037,8 @@ export default function VideoEditor() {
 			setSelectedTrimId(null);
 			setSelectedSpeedId(null);
 			setSelectedBlurId(null);
+			setSelectedWebcamZoomId(null);
+			setSelectedWebcamTakeoverId(null);
 		}
 	}, []);
 
@@ -1021,6 +1049,8 @@ export default function VideoEditor() {
 			setSelectedTrimId(null);
 			setSelectedAnnotationId(null);
 			setSelectedSpeedId(null);
+			setSelectedWebcamZoomId(null);
+			setSelectedWebcamTakeoverId(null);
 		}
 	}, []);
 
@@ -1419,6 +1449,144 @@ export default function VideoEditor() {
 			setSelectedSpeedId(null);
 		},
 		[pushState],
+	);
+
+	// ── Webcam Zoom handlers
+
+	const handleWebcamZoomAdded = useCallback(
+		(span: Span) => {
+			const id = `webcam-zoom-${nextWebcamZoomIdRef.current++}`;
+			const newRegion: WebcamZoomRegion = {
+				id,
+				startMs: Math.round(span.start),
+				endMs: Math.round(span.end),
+				scale: DEFAULT_WEBCAM_ZOOM_SCALE,
+				transitionDurationMs: DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
+			};
+			pushState((prev) => ({ webcamZoomRegions: [...prev.webcamZoomRegions, newRegion] }));
+			setSelectedWebcamZoomId(id);
+			setSelectedZoomId(null);
+			setSelectedTrimId(null);
+			setSelectedSpeedId(null);
+			setSelectedAnnotationId(null);
+			setSelectedBlurId(null);
+			setSelectedWebcamTakeoverId(null);
+		},
+		[pushState],
+	);
+
+	const handleWebcamZoomSpanChange = useCallback(
+		(id: string, span: Span) => {
+			pushState((prev) => ({
+				webcamZoomRegions: prev.webcamZoomRegions.map((r) =>
+					r.id === id ? { ...r, startMs: Math.round(span.start), endMs: Math.round(span.end) } : r,
+				),
+			}));
+		},
+		[pushState],
+	);
+
+	const handleWebcamZoomDelete = useCallback(
+		(id: string) => {
+			pushState((prev) => ({
+				webcamZoomRegions: prev.webcamZoomRegions.filter((r) => r.id !== id),
+			}));
+			if (selectedWebcamZoomId === id) setSelectedWebcamZoomId(null);
+		},
+		[selectedWebcamZoomId, pushState],
+	);
+
+	const handleWebcamZoomScaleChange = useCallback(
+		(scale: WebcamZoomScale) => {
+			if (!selectedWebcamZoomId) return;
+			pushState((prev) => ({
+				webcamZoomRegions: prev.webcamZoomRegions.map((r) =>
+					r.id === selectedWebcamZoomId ? { ...r, scale } : r,
+				),
+			}));
+		},
+		[selectedWebcamZoomId, pushState],
+	);
+
+	const handleWebcamZoomDurationChange = useCallback(
+		(transitionDurationMs: number) => {
+			if (!selectedWebcamZoomId) return;
+			pushState((prev) => ({
+				webcamZoomRegions: prev.webcamZoomRegions.map((r) =>
+					r.id === selectedWebcamZoomId ? { ...r, transitionDurationMs } : r,
+				),
+			}));
+		},
+		[selectedWebcamZoomId, pushState],
+	);
+
+	// ── Webcam Takeover handlers
+
+	const handleWebcamTakeoverAdded = useCallback(
+		(span: Span) => {
+			const id = `webcam-takeover-${nextWebcamTakeoverIdRef.current++}`;
+			const newRegion: WebcamTakeoverRegion = {
+				id,
+				startMs: Math.round(span.start),
+				endMs: Math.round(span.end),
+				transition: DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+				transitionDurationMs: DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
+			};
+			pushState((prev) => ({ webcamTakeoverRegions: [...prev.webcamTakeoverRegions, newRegion] }));
+			setSelectedWebcamTakeoverId(id);
+			setSelectedZoomId(null);
+			setSelectedTrimId(null);
+			setSelectedSpeedId(null);
+			setSelectedAnnotationId(null);
+			setSelectedBlurId(null);
+			setSelectedWebcamZoomId(null);
+		},
+		[pushState],
+	);
+
+	const handleWebcamTakeoverSpanChange = useCallback(
+		(id: string, span: Span) => {
+			pushState((prev) => ({
+				webcamTakeoverRegions: prev.webcamTakeoverRegions.map((r) =>
+					r.id === id ? { ...r, startMs: Math.round(span.start), endMs: Math.round(span.end) } : r,
+				),
+			}));
+		},
+		[pushState],
+	);
+
+	const handleWebcamTakeoverDelete = useCallback(
+		(id: string) => {
+			pushState((prev) => ({
+				webcamTakeoverRegions: prev.webcamTakeoverRegions.filter((r) => r.id !== id),
+			}));
+			if (selectedWebcamTakeoverId === id) setSelectedWebcamTakeoverId(null);
+		},
+		[selectedWebcamTakeoverId, pushState],
+	);
+
+	const handleWebcamTakeoverTransitionChange = useCallback(
+		(transition: WebcamTakeoverTransition) => {
+			if (!selectedWebcamTakeoverId) return;
+			pushState((prev) => ({
+				webcamTakeoverRegions: prev.webcamTakeoverRegions.map((r) =>
+					r.id === selectedWebcamTakeoverId ? { ...r, transition } : r,
+				),
+			}));
+		},
+		[selectedWebcamTakeoverId, pushState],
+	);
+
+	const handleWebcamTakeoverDurationChange = useCallback(
+		(transitionDurationMs: number) => {
+			if (!selectedWebcamTakeoverId) return;
+			pushState((prev) => ({
+				webcamTakeoverRegions: prev.webcamTakeoverRegions.map((r) =>
+					r.id === selectedWebcamTakeoverId ? { ...r, transitionDurationMs } : r,
+				),
+			}));
+		},
+		[selectedWebcamTakeoverId, pushState],
 	);
 
 	const handleAnnotationSpanChange = useCallback(
@@ -1929,6 +2097,8 @@ export default function VideoEditor() {
 						webcamReactiveZoom,
 						webcamSizePreset,
 						webcamPosition,
+						webcamZoomRegions,
+						webcamTakeoverRegions,
 						previewWidth,
 						previewHeight,
 						cursorTelemetry,
@@ -2023,6 +2193,8 @@ export default function VideoEditor() {
 						webcamReactiveZoom,
 						webcamSizePreset,
 						webcamPosition,
+						webcamZoomRegions,
+						webcamTakeoverRegions,
 						previewWidth,
 						previewHeight,
 						cursorTelemetry,
@@ -2126,6 +2298,8 @@ export default function VideoEditor() {
 			webcamReactiveZoom,
 			webcamSizePreset,
 			webcamPosition,
+			webcamZoomRegions,
+			webcamTakeoverRegions,
 			exportQuality,
 			handleExportSaved,
 			cursorTelemetry,
@@ -2658,6 +2832,8 @@ export default function VideoEditor() {
 													cursorClipToBounds={cursorClipToBounds}
 													cursorTheme={cursorTheme}
 													isPreviewingZoom={isPreviewingZoom}
+													webcamZoomRegions={webcamZoomRegions}
+													webcamTakeoverRegions={webcamTakeoverRegions}
 												/>
 											</div>
 										</div>
@@ -2807,6 +2983,8 @@ export default function VideoEditor() {
 											setSelectedZoomId(null);
 											setSelectedTrimId(null);
 											setSelectedSpeedId(null);
+											setSelectedWebcamZoomId(null);
+											setSelectedWebcamTakeoverId(null);
 										}}
 										selectedAnnotationId={selectedAnnotationId}
 										annotationRegions={annotationOnlyRegions}
@@ -2851,6 +3029,38 @@ export default function VideoEditor() {
 											hasNativeCursorRecordingData(cursorRecordingData)
 										}
 										showCursorSettings={showCursorSettings}
+										selectedWebcamZoomId={selectedWebcamZoomId}
+										selectedWebcamZoomScale={
+											selectedWebcamZoomId
+												? (webcamZoomRegions.find((r) => r.id === selectedWebcamZoomId)?.scale ??
+													null)
+												: null
+										}
+										onWebcamZoomScaleChange={handleWebcamZoomScaleChange}
+										selectedWebcamZoomTransitionDuration={
+											selectedWebcamZoomId
+												? (webcamZoomRegions.find((r) => r.id === selectedWebcamZoomId)
+														?.transitionDurationMs ?? null)
+												: null
+										}
+										onWebcamZoomDurationChange={handleWebcamZoomDurationChange}
+										onWebcamZoomDelete={handleWebcamZoomDelete}
+										selectedWebcamTakeoverId={selectedWebcamTakeoverId}
+										selectedWebcamTakeoverTransition={
+											selectedWebcamTakeoverId
+												? (webcamTakeoverRegions.find((r) => r.id === selectedWebcamTakeoverId)
+														?.transition ?? null)
+												: null
+										}
+										onWebcamTakeoverTransitionChange={handleWebcamTakeoverTransitionChange}
+										selectedWebcamTakeoverDuration={
+											selectedWebcamTakeoverId
+												? (webcamTakeoverRegions.find((r) => r.id === selectedWebcamTakeoverId)
+														?.transitionDurationMs ?? null)
+												: null
+										}
+										onWebcamTakeoverDurationChange={handleWebcamTakeoverDurationChange}
+										onWebcamTakeoverDelete={handleWebcamTakeoverDelete}
 									/>
 								</div>
 							</div>
@@ -2927,6 +3137,19 @@ export default function VideoEditor() {
 										}
 										setShowAutoCaptionsDialog(true);
 									}}
+									hasWebcam={Boolean(webcamVideoPath)}
+									webcamZoomRegions={webcamZoomRegions}
+									onWebcamZoomAdded={handleWebcamZoomAdded}
+									onWebcamZoomSpanChange={handleWebcamZoomSpanChange}
+									onWebcamZoomDelete={handleWebcamZoomDelete}
+									selectedWebcamZoomId={selectedWebcamZoomId}
+									onSelectWebcamZoom={setSelectedWebcamZoomId}
+									webcamTakeoverRegions={webcamTakeoverRegions}
+									onWebcamTakeoverAdded={handleWebcamTakeoverAdded}
+									onWebcamTakeoverSpanChange={handleWebcamTakeoverSpanChange}
+									onWebcamTakeoverDelete={handleWebcamTakeoverDelete}
+									selectedWebcamTakeoverId={selectedWebcamTakeoverId}
+									onSelectWebcamTakeover={setSelectedWebcamTakeoverId}
 								/>
 							</div>
 						</Panel>

@@ -101,6 +101,8 @@ interface FrameRenderConfig {
 	webcamReactiveZoom?: boolean;
 	webcamSizePreset?: WebcamSizePreset;
 	webcamPosition?: { cx: number; cy: number } | null;
+	webcamZoomRegions?: import("@/components/video-editor/types").WebcamZoomRegion[];
+	webcamTakeoverRegions?: import("@/components/video-editor/types").WebcamTakeoverRegion[];
 	annotationRegions?: AnnotationRegion[];
 	speedRegions?: SpeedRegion[];
 	previewWidth?: number;
@@ -1018,12 +1020,17 @@ export class FrameRenderer {
 		}
 
 		const webcamRect = this.layoutCache?.webcamRect ?? null;
+		const layoutMaskRect = this.layoutCache?.maskRect ?? null;
 		if (webcamFrame && webcamRect) {
+			const timeMs = this.currentVideoTime * 1000;
+			const zoomRegions = this.config.webcamZoomRegions ?? [];
+			const takeoverRegions = this.config.webcamTakeoverRegions ?? [];
+
+			const activeZoom = zoomRegions.find((r) => timeMs >= r.startMs && timeMs <= r.endMs);
+			const activeTakeover = takeoverRegions.find((r) => timeMs >= r.startMs && timeMs <= r.endMs);
+
 			const preset = getWebcamLayoutPresetDefinition(this.config.webcamLayoutPreset);
 			const shape = webcamRect.maskShape ?? this.config.webcamMaskShape ?? "rectangle";
-			// Scale the PiP webcam inversely with the eased zoom, anchoring the shrink to the
-			// docked corner (bottom-right by default) like the preview, so it stays flush to the
-			// edges instead of drifting toward center.
 			const reactiveFactor =
 				this.config.webcamReactiveZoom && this.config.webcamLayoutPreset === "picture-in-picture"
 					? reactiveWebcamScale(this.animationState.appliedScale)
@@ -1031,7 +1038,7 @@ export class FrameRenderer {
 			const camPos = this.config.webcamPosition;
 			const biasX = (camPos ? camPos.cx >= 0.5 : true) ? 1 : 0;
 			const biasY = (camPos ? camPos.cy >= 0.5 : true) ? 1 : 0;
-			const drawRect =
+			const baseRect =
 				reactiveFactor < 1
 					? {
 							width: webcamRect.width * reactiveFactor,
@@ -1041,6 +1048,7 @@ export class FrameRenderer {
 							borderRadius: webcamRect.borderRadius * reactiveFactor,
 						}
 					: webcamRect;
+
 			const sourceWidth =
 				("displayWidth" in webcamFrame && webcamFrame.displayWidth > 0
 					? webcamFrame.displayWidth
@@ -1050,49 +1058,142 @@ export class FrameRenderer {
 					? webcamFrame.displayHeight
 					: webcamFrame.codedHeight) || webcamRect.height;
 			const sourceAspect = sourceWidth / sourceHeight;
-			const targetAspect = webcamRect.width / webcamRect.height;
+
+			// Compute interpolated takeover state (0 = normal webcam, 1 = full takeover)
+			let takeoverT = 0;
+			let isBlurZoom = false;
+			if (activeTakeover && layoutMaskRect) {
+				const dur = activeTakeover.transitionDurationMs ?? 400;
+				isBlurZoom = activeTakeover.transition === "blur-zoom";
+				const halfDur = dur / 2;
+				const zoomInEnd = activeTakeover.startMs + halfDur;
+				const zoomOutStart = activeTakeover.endMs - halfDur;
+
+				if (timeMs < zoomInEnd && halfDur > 0) {
+					const raw = (timeMs - activeTakeover.startMs) / halfDur;
+					takeoverT = Math.min(1, raw);
+				} else if (timeMs > zoomOutStart && halfDur > 0) {
+					const raw = (activeTakeover.endMs - timeMs) / halfDur;
+					takeoverT = Math.min(1, raw);
+				} else {
+					takeoverT = 1;
+				}
+				// ease-out cubic-bezier(0.4,0,0.2,1) approximation
+				takeoverT = 1 - Math.pow(1 - takeoverT, 2.2);
+			}
+
+			// Interpolate webcam rect between normal position and screen-filling position
+			let drawX = baseRect.x;
+			let drawY = baseRect.y;
+			let drawW = baseRect.width;
+			let drawH = baseRect.height;
+			let drawRadius = baseRect.borderRadius;
+
+			if (takeoverT > 0 && layoutMaskRect) {
+				const sr = layoutMaskRect;
+				drawX = baseRect.x + (sr.x - baseRect.x) * takeoverT;
+				drawY = baseRect.y + (sr.y - baseRect.y) * takeoverT;
+				drawW = baseRect.width + (sr.width - baseRect.width) * takeoverT;
+				drawH = baseRect.height + (sr.height - baseRect.height) * takeoverT;
+				drawRadius = baseRect.borderRadius + (8 - baseRect.borderRadius) * takeoverT;
+			}
+
+			const drawAspect = drawW / drawH;
 			const sourceCropWidth =
-				sourceAspect > targetAspect ? Math.round(sourceHeight * targetAspect) : sourceWidth;
+				sourceAspect > drawAspect ? Math.round(sourceHeight * drawAspect) : sourceWidth;
 			const sourceCropHeight =
-				sourceAspect > targetAspect ? sourceHeight : Math.round(sourceWidth / targetAspect);
+				sourceAspect > drawAspect ? sourceHeight : Math.round(sourceWidth / drawAspect);
 			const sourceCropX = Math.max(0, Math.round((sourceWidth - sourceCropWidth) / 2));
 			const sourceCropY = Math.max(0, Math.round((sourceHeight - sourceCropHeight) / 2));
+
+			// Blur-zoom overlay: darken background during transition-in
+			if (isBlurZoom && takeoverT > 0) {
+				fgCtx.save();
+				fgCtx.fillStyle = `rgba(0,0,0,${0.4 * takeoverT})`;
+				fgCtx.fillRect(0, 0, w, h);
+				fgCtx.restore();
+			}
+
+			// Compute webcam zoom scale with smoothstep easing
+			let zoomScale = 1;
+			if (activeZoom) {
+				const targetScale = activeZoom.scale;
+				const halfDur = (activeZoom.transitionDurationMs ?? 300) / 2;
+				const zoomInEnd = activeZoom.startMs + halfDur;
+				const zoomOutStart = activeZoom.endMs - halfDur;
+
+				if (timeMs < zoomInEnd && halfDur > 0) {
+					const t = Math.min(1, (timeMs - activeZoom.startMs) / halfDur);
+					zoomScale = 1 + (targetScale - 1) * (t * t * (3 - 2 * t));
+				} else if (timeMs > zoomOutStart && halfDur > 0) {
+					const t = Math.min(1, (activeZoom.endMs - timeMs) / halfDur);
+					zoomScale = 1 + (targetScale - 1) * (t * t * (3 - 2 * t));
+				} else {
+					zoomScale = targetScale;
+				}
+			}
+
 			fgCtx.save();
 			drawCanvasClipPath(
 				fgCtx,
-				drawRect.x,
-				drawRect.y,
-				drawRect.width,
-				drawRect.height,
-				shape,
-				drawRect.borderRadius,
+				drawX,
+				drawY,
+				drawW,
+				drawH,
+				takeoverT >= 1 ? "rectangle" : shape,
+				drawRadius,
 			);
-			if (preset.shadow) {
+			if (preset.shadow && takeoverT < 1) {
 				fgCtx.shadowColor = preset.shadow.color;
-				fgCtx.shadowBlur = preset.shadow.blur;
+				fgCtx.shadowBlur = preset.shadow.blur * (1 - takeoverT);
 				fgCtx.shadowOffsetX = preset.shadow.offsetX;
 				fgCtx.shadowOffsetY = preset.shadow.offsetY;
 			}
 			fgCtx.fillStyle = "#000000";
 			fgCtx.fill();
 			fgCtx.clip();
-			drawWebcamFrameImage(
-				fgCtx,
-				webcamFrame as unknown as CanvasImageSource,
-				{
-					x: sourceCropX,
-					y: sourceCropY,
-					width: sourceCropWidth,
-					height: sourceCropHeight,
-				},
-				{
-					x: drawRect.x,
-					y: drawRect.y,
-					width: drawRect.width,
-					height: drawRect.height,
-				},
-				this.config.webcamMirrored,
-			);
+
+			if (zoomScale !== 1) {
+				const cx = drawX + drawW / 2;
+				const cy = drawY + drawH / 2;
+				const scaledW = drawW * zoomScale;
+				const scaledH = drawH * zoomScale;
+				drawWebcamFrameImage(
+					fgCtx,
+					webcamFrame as unknown as CanvasImageSource,
+					{
+						x: sourceCropX,
+						y: sourceCropY,
+						width: sourceCropWidth,
+						height: sourceCropHeight,
+					},
+					{
+						x: cx - scaledW / 2,
+						y: cy - scaledH / 2,
+						width: scaledW,
+						height: scaledH,
+					},
+					this.config.webcamMirrored,
+				);
+			} else {
+				drawWebcamFrameImage(
+					fgCtx,
+					webcamFrame as unknown as CanvasImageSource,
+					{
+						x: sourceCropX,
+						y: sourceCropY,
+						width: sourceCropWidth,
+						height: sourceCropHeight,
+					},
+					{
+						x: drawX,
+						y: drawY,
+						width: drawW,
+						height: drawH,
+					},
+					this.config.webcamMirrored,
+				);
+			}
 			fgCtx.restore();
 		}
 	}

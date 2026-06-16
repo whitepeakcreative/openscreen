@@ -12,7 +12,9 @@
 		"pressTrim": "按 T 添加剪辑",
 		"pressAnnotation": "按 A 添加标注",
 		"pressSpeed": "按 S 添加速度",
-		"pressBlur": "按 B 添加模糊区域"
+		"pressBlur": "按 B 添加模糊区域",
+		"pressWebcamZoom": "按 W 添加摄像头缩放",
+		"pressWebcamTakeover": "按 K 添加摄像头接管"
 	},
 	"labels": {
 		"pan": "平移",

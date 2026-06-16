@@ -17,7 +17,7 @@ interface ItemProps {
 	zoomCustomScale?: number;
 	speedValue?: number;
 	isAutoFocus?: boolean;
-	variant?: "zoom" | "trim" | "annotation" | "speed" | "blur";
+	variant?: "zoom" | "trim" | "annotation" | "speed" | "blur" | "webcam-zoom" | "webcam-takeover";
 }
 
 // Map zoom depth to multiplier labels

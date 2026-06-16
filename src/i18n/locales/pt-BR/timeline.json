@@ -12,7 +12,9 @@
 		"pressTrim": "Pressione T para adicionar recorte",
 		"pressAnnotation": "Pressione A para adicionar anotação",
 		"pressBlur": "Pressione B para adicionar região de desfoque",
-		"pressSpeed": "Pressione S para adicionar velocidade"
+		"pressSpeed": "Pressione S para adicionar velocidade",
+		"pressWebcamZoom": "Pressione W para adicionar zoom da câmera",
+		"pressWebcamTakeover": "Pressione K para adicionar takeover da câmera"
 	},
 	"labels": {
 		"pan": "Mover",

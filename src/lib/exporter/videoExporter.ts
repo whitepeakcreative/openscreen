@@ -41,6 +41,8 @@ export interface VideoExporterConfig extends ExportConfig {
 	webcamReactiveZoom?: boolean;
 	webcamSizePreset?: WebcamSizePreset;
 	webcamPosition?: { cx: number; cy: number } | null;
+	webcamZoomRegions?: import("@/components/video-editor/types").WebcamZoomRegion[];
+	webcamTakeoverRegions?: import("@/components/video-editor/types").WebcamTakeoverRegion[];
 	cursorRecordingData?: CursorRecordingData | null;
 	cursorScale?: number;
 	cursorSmoothing?: number;
@@ -256,6 +258,8 @@ export class VideoExporter {
 				webcamReactiveZoom: this.config.webcamReactiveZoom,
 				webcamSizePreset: this.config.webcamSizePreset,
 				webcamPosition: this.config.webcamPosition,
+				webcamZoomRegions: this.config.webcamZoomRegions,
+				webcamTakeoverRegions: this.config.webcamTakeoverRegions,
 				annotationRegions: this.config.annotationRegions,
 				speedRegions: this.config.speedRegions,
 				previewWidth: this.config.previewWidth,

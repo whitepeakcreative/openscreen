@@ -148,6 +148,8 @@ interface VideoPlaybackProps {
 	// Render the selected zoom at the playhead even while paused, so the editor can
 	// preview the effect without leaving the focus-edit view.
 	isPreviewingZoom?: boolean;
+	webcamZoomRegions?: import("./types").WebcamZoomRegion[];
+	webcamTakeoverRegions?: import("./types").WebcamTakeoverRegion[];
 }
 
 export interface VideoPlaybackRef {
@@ -273,6 +275,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			cursorClipToBounds = DEFAULT_CURSOR_SETTINGS.clipToBounds,
 			cursorTheme = DEFAULT_CURSOR_SETTINGS.theme,
 			isPreviewingZoom = false,
+			webcamZoomRegions = [],
+			webcamTakeoverRegions = [],
 		},
 		ref,
 	) => {
@@ -301,6 +305,45 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		const outerWrapperRef = useRef<HTMLDivElement | null>(null);
 		const [webcamLayout, setWebcamLayout] = useState<StyledRenderRect | null>(null);
 		const [webcamDimensions, setWebcamDimensions] = useState<Size | null>(null);
+		const webcamEffects = useMemo(() => {
+			const timeMs = currentTime * 1000;
+			const activeZoom = webcamZoomRegions.find((r) => timeMs >= r.startMs && timeMs <= r.endMs);
+			const activeTakeover = webcamTakeoverRegions.find(
+				(r) => timeMs >= r.startMs && timeMs <= r.endMs,
+			);
+			let zoomScale = 1;
+			let webcamMotionBlurPx = 0;
+			if (activeZoom) {
+				const targetScale = activeZoom.scale;
+				const halfTransition = activeZoom.transitionDurationMs / 2;
+				const zoomInEnd = activeZoom.startMs + halfTransition;
+				const zoomOutStart = activeZoom.endMs - halfTransition;
+				let transitionT = 0;
+				if (timeMs < zoomInEnd && halfTransition > 0) {
+					const t = Math.min(1, (timeMs - activeZoom.startMs) / halfTransition);
+					zoomScale = 1 + (targetScale - 1) * (t * t * (3 - 2 * t));
+					transitionT = t;
+				} else if (timeMs > zoomOutStart && halfTransition > 0) {
+					const t = Math.min(1, (activeZoom.endMs - timeMs) / halfTransition);
+					zoomScale = 1 + (targetScale - 1) * (t * t * (3 - 2 * t));
+					transitionT = t;
+				} else {
+					zoomScale = targetScale;
+				}
+				if (transitionT > 0) {
+					const velocity = 6 * transitionT * (1 - transitionT);
+					const maxBlurPx = 10 * (targetScale - 1);
+					webcamMotionBlurPx = (velocity / 1.5) * maxBlurPx;
+				}
+			}
+			return {
+				zoomScale,
+				webcamMotionBlurPx,
+				activeTakeover,
+				takeoverTransitionMs: activeTakeover?.transitionDurationMs ?? 400,
+				isBlurZoom: activeTakeover?.transition === "blur-zoom",
+			};
+		}, [currentTime, webcamZoomRegions, webcamTakeoverRegions]);
 		const currentTimeRef = useRef(0);
 		const zoomRegionsRef = useRef<ZoomRegion[]>([]);
 		const cursorTelemetryRef = useRef<CursorTelemetryPoint[]>([]);
@@ -1931,33 +1974,68 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 						(() => {
 							const clipPath = getCssClipPath(webcamLayout?.maskShape ?? "rectangle");
 							const useClipPath = !!clipPath;
+							const {
+								zoomScale,
+								webcamMotionBlurPx,
+								activeTakeover,
+								takeoverTransitionMs,
+								isBlurZoom,
+							} = webcamEffects;
+							const isTakeover = Boolean(activeTakeover);
+							const transitionCss = isPlaying
+								? `left ${takeoverTransitionMs}ms cubic-bezier(0.4,0,0.2,1), top ${takeoverTransitionMs}ms cubic-bezier(0.4,0,0.2,1), width ${takeoverTransitionMs}ms cubic-bezier(0.4,0,0.2,1), height ${takeoverTransitionMs}ms cubic-bezier(0.4,0,0.2,1), border-radius ${takeoverTransitionMs}ms cubic-bezier(0.4,0,0.2,1)`
+								: undefined;
+							const screen = baseMaskRef.current;
 							return (
 								<div
 									ref={webcamWrapperRef}
-									className="absolute"
+									className="absolute overflow-hidden"
 									style={{
-										left: webcamLayout?.x ?? 0,
-										top: webcamLayout?.y ?? 0,
-										width: webcamLayout?.width ?? 0,
-										height: webcamLayout?.height ?? 0,
+										left: isTakeover ? screen.x : (webcamLayout?.x ?? 0),
+										top: isTakeover ? screen.y : (webcamLayout?.y ?? 0),
+										width: isTakeover ? screen.width : (webcamLayout?.width ?? 0),
+										height: isTakeover ? screen.height : (webcamLayout?.height ?? 0),
+										borderRadius: isTakeover ? 8 : undefined,
 										zIndex: 20,
 										opacity: webcamLayout ? 1 : 0,
 										filter:
-											useClipPath && webcamCssBoxShadow !== "none"
+											!isTakeover && useClipPath && webcamCssBoxShadow !== "none"
 												? `drop-shadow(${webcamCssBoxShadow})`
 												: undefined,
+										transition: transitionCss,
 									}}
 								>
+									{isTakeover && isBlurZoom && (
+										<div
+											className="absolute inset-0"
+											style={{ background: "rgba(0,0,0,0.4)", zIndex: 0 }}
+										/>
+									)}
 									<video
 										ref={webcamVideoRef}
 										src={webcamVideoPath}
-										className={`w-full h-full object-cover ${webcamLayoutPreset === "picture-in-picture" ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
+										className={`w-full h-full object-cover ${webcamLayoutPreset === "picture-in-picture" && !isTakeover ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
 										style={{
-											borderRadius: useClipPath ? 0 : (webcamLayout?.borderRadius ?? 0),
-											clipPath: clipPath ?? undefined,
-											boxShadow: useClipPath ? "none" : webcamCssBoxShadow,
+											borderRadius: isTakeover
+												? 0
+												: useClipPath
+													? 0
+													: (webcamLayout?.borderRadius ?? 0),
+											clipPath: isTakeover ? undefined : (clipPath ?? undefined),
+											boxShadow: isTakeover || useClipPath ? "none" : webcamCssBoxShadow,
 											backgroundColor: "#000",
-											transform: webcamMirrored ? "scaleX(-1)" : undefined,
+											transform: [
+												webcamMirrored ? "scaleX(-1)" : undefined,
+												zoomScale !== 1 ? `scale(${zoomScale.toFixed(3)})` : undefined,
+											]
+												.filter(Boolean)
+												.join(" "),
+											filter:
+												webcamMotionBlurPx > 0.2
+													? `blur(${webcamMotionBlurPx.toFixed(2)}px)`
+													: undefined,
+											position: "relative",
+											zIndex: 1,
 										}}
 										onPointerDown={handleWebcamPointerDown}
 										onPointerMove={handleWebcamPointerMove}

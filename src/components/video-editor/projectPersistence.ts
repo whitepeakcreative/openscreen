@@ -527,7 +527,9 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 						startMs: Math.max(0, isFiniteNumber(r.startMs) ? Math.round(r.startMs) : 0),
 						endMs: Math.max(1, isFiniteNumber(r.endMs) ? Math.round(r.endMs) : 1000),
 						scale: [1.5, 2, 2.5, 3, 4].includes(r.scale) ? r.scale : DEFAULT_WEBCAM_ZOOM_SCALE,
-						transitionDurationMs: isFiniteNumber(r.transitionDurationMs) ? Math.max(0, r.transitionDurationMs) : DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
+						transitionDurationMs: isFiniteNumber(r.transitionDurationMs)
+							? Math.max(0, r.transitionDurationMs)
+							: DEFAULT_WEBCAM_ZOOM_TRANSITION_MS,
 					}))
 			: [],
 		webcamTakeoverRegions: Array.isArray(editor.webcamTakeoverRegions)
@@ -537,8 +539,12 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 						id: r.id,
 						startMs: Math.max(0, isFiniteNumber(r.startMs) ? Math.round(r.startMs) : 0),
 						endMs: Math.max(1, isFiniteNumber(r.endMs) ? Math.round(r.endMs) : 1000),
-						transition: ["zoom", "blur-zoom"].includes(r.transition) ? r.transition : DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
-						transitionDurationMs: isFiniteNumber(r.transitionDurationMs) ? Math.max(0, r.transitionDurationMs) : DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
+						transition: ["zoom", "blur-zoom"].includes(r.transition)
+							? r.transition
+							: DEFAULT_WEBCAM_TAKEOVER_TRANSITION,
+						transitionDurationMs: isFiniteNumber(r.transitionDurationMs)
+							? Math.max(0, r.transitionDurationMs)
+							: DEFAULT_WEBCAM_TAKEOVER_TRANSITION_MS,
 					}))
 			: [],
 		exportQuality:

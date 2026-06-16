@@ -48,7 +48,10 @@ if (process.platform === "linux") {
 
 // Windows AMD/hybrid GPU fix: force discrete GPU on machines with hybrid graphics
 if (process.platform === "win32") {
-	app.commandLine.appendSwitch("disable-features", "MediaFoundationVideoCapture,DirectCompositionVideoOverlays,UseChromeOSDirectVideoDecoder");
+	app.commandLine.appendSwitch(
+		"disable-features",
+		"MediaFoundationVideoCapture,DirectCompositionVideoOverlays,UseChromeOSDirectVideoDecoder",
+	);
 	app.commandLine.appendSwitch("disable-gpu-driver-bug-workarounds");
 	app.commandLine.appendSwitch("disable-direct-composition");
 }

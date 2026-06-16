@@ -16,7 +16,9 @@
 		"pressTrim": "Press T to add trim",
 		"pressAnnotation": "Press A to add annotation",
 		"pressBlur": "Press B to add blur region",
-		"pressSpeed": "Press S to add speed"
+		"pressSpeed": "Press S to add speed",
+		"pressWebcamZoom": "Press W to add cam zoom",
+		"pressWebcamTakeover": "Press K to add cam takeover"
 	},
 	"labels": {
 		"pan": "Pan",

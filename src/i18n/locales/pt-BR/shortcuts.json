@@ -21,7 +21,9 @@
 		"addBlur": "Adicionar Desfoque",
 		"addKeyframe": "Adicionar Quadro-chave",
 		"deleteSelected": "Excluir Selecionado",
-		"playPause": "Reproduzir / Pausar"
+		"playPause": "Reproduzir / Pausar",
+		"addWebcamZoom": "Adicionar Zoom da Câmera",
+		"addWebcamTakeover": "Adicionar Takeover da Câmera"
 	},
 	"fixedActions": {
 		"undo": "Desfazer",

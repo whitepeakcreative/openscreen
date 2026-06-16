@@ -12,7 +12,9 @@
 		"pressTrim": "اضغط T لإضافة قص",
 		"pressAnnotation": "اضغط A لإضافة شرح",
 		"pressBlur": "اضغط B لإضافة منطقة تمويه",
-		"pressSpeed": "اضغط S لإضافة سرعة"
+		"pressSpeed": "اضغط S لإضافة سرعة",
+		"pressWebcamZoom": "اضغط W لإضافة تكبير الكاميرا",
+		"pressWebcamTakeover": "اضغط K لإضافة استلام الكاميرا"
 	},
 	"labels": {
 		"pan": "تحريك",

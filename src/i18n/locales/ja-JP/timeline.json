@@ -12,7 +12,9 @@
 		"pressTrim": "Tキーを押してトリムを追加",
 		"pressAnnotation": "Aキーを押して注釈を追加",
 		"pressBlur": "Bキーを押してぼかしを追加",
-		"pressSpeed": "Sキーを押して再生速度を追加"
+		"pressSpeed": "Sキーを押して再生速度を追加",
+		"pressWebcamZoom": "Wキーを押してカメラズームを追加",
+		"pressWebcamTakeover": "Kキーを押してカメラ切り替えを追加"
 	},
 	"labels": {
 		"pan": "移動",

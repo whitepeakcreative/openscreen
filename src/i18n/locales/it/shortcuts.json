@@ -23,7 +23,9 @@
 		"addBlur": "Aggiungi sfocatura",
 		"addKeyframe": "Aggiungi fotogramma chiave",
 		"deleteSelected": "Elimina selezionato",
-		"playPause": "Riproduci / Pausa"
+		"playPause": "Riproduci / Pausa",
+		"addWebcamZoom": "Aggiungi zoom fotocamera",
+		"addWebcamTakeover": "Aggiungi takeover fotocamera"
 	},
 	"fixedActions": {
 		"undo": "Annulla",

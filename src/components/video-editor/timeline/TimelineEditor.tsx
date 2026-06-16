@@ -30,7 +30,14 @@ import { cn } from "@/lib/utils";
 import { ASPECT_RATIOS, type AspectRatio, getAspectRatioLabel } from "@/utils/aspectRatioUtils";
 import { formatShortcut } from "@/utils/platformUtils";
 import { BLUR_REGIONS_ENABLED } from "../featureFlags";
-import type { AnnotationRegion, SpeedRegion, TrimRegion, ZoomRegion } from "../types";
+import type {
+	AnnotationRegion,
+	SpeedRegion,
+	TrimRegion,
+	WebcamTakeoverRegion,
+	WebcamZoomRegion,
+	ZoomRegion,
+} from "../types";
 import BackgroundWaveform from "./BackgroundWaveform";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
@@ -42,6 +49,8 @@ const TRIM_ROW_ID = "row-trim";
 const ANNOTATION_ROW_ID = "row-annotation";
 const BLUR_ROW_ID = "row-blur";
 const SPEED_ROW_ID = "row-speed";
+const WEBCAM_ZOOM_ROW_ID = "row-webcam-zoom";
+const WEBCAM_TAKEOVER_ROW_ID = "row-webcam-takeover";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
 
@@ -95,6 +104,19 @@ interface TimelineEditorProps {
 	isGeneratingCaptions?: boolean;
 	/** Localized label for the auto-captions button (lives in the `editor` namespace). */
 	captionsLabel?: string;
+	hasWebcam?: boolean;
+	webcamZoomRegions?: WebcamZoomRegion[];
+	onWebcamZoomAdded?: (span: Span) => void;
+	onWebcamZoomSpanChange?: (id: string, span: Span) => void;
+	onWebcamZoomDelete?: (id: string) => void;
+	selectedWebcamZoomId?: string | null;
+	onSelectWebcamZoom?: (id: string | null) => void;
+	webcamTakeoverRegions?: WebcamTakeoverRegion[];
+	onWebcamTakeoverAdded?: (span: Span) => void;
+	onWebcamTakeoverSpanChange?: (id: string, span: Span) => void;
+	onWebcamTakeoverDelete?: (id: string) => void;
+	selectedWebcamTakeoverId?: string | null;
+	onSelectWebcamTakeover?: (id: string | null) => void;
 }
 
 interface TimelineScaleConfig {
@@ -112,7 +134,7 @@ interface TimelineRenderItem {
 	zoomCustomScale?: number;
 	speedValue?: number;
 	isAutoFocus?: boolean;
-	variant: "zoom" | "trim" | "annotation" | "speed" | "blur";
+	variant: "zoom" | "trim" | "annotation" | "speed" | "blur" | "webcam-zoom" | "webcam-takeover";
 }
 
 const SCALE_CANDIDATES = [
@@ -571,6 +593,11 @@ function Timeline({
 	keyframes = [],
 	videoUrl,
 	showTrimWaveform = false,
+	hasWebcam = false,
+	onSelectWebcamZoom,
+	onSelectWebcamTakeover,
+	selectedWebcamZoomId,
+	selectedWebcamTakeoverId,
 }: {
 	items: TimelineRenderItem[];
 	videoDurationMs: number;
@@ -590,6 +617,11 @@ function Timeline({
 	keyframes?: { id: string; time: number }[];
 	videoUrl?: string;
 	showTrimWaveform?: boolean;
+	hasWebcam?: boolean;
+	onSelectWebcamZoom?: (id: string | null) => void;
+	onSelectWebcamTakeover?: (id: string | null) => void;
+	selectedWebcamZoomId?: string | null;
+	selectedWebcamTakeoverId?: string | null;
 }) {
 	const t = useScopedT("timeline");
 	const { setTimelineRef, style, sidebarWidth, range, pixelsToValue } = useTimelineContext();
@@ -749,6 +781,8 @@ function Timeline({
 	const annotationItems = items.filter((item) => item.rowId === ANNOTATION_ROW_ID);
 	const blurItems = items.filter((item) => item.rowId === BLUR_ROW_ID);
 	const speedItems = items.filter((item) => item.rowId === SPEED_ROW_ID);
+	const webcamZoomItems = items.filter((item) => item.rowId === WEBCAM_ZOOM_ROW_ID);
+	const webcamTakeoverItems = items.filter((item) => item.rowId === WEBCAM_TAKEOVER_ROW_ID);
 
 	return (
 		<div
@@ -878,6 +912,54 @@ function Timeline({
 					</Item>
 				))}
 			</Row>
+
+			{hasWebcam && (
+				<Row
+					id={WEBCAM_ZOOM_ROW_ID}
+					isEmpty={webcamZoomItems.length === 0}
+					hint="Press W for Cam Zoom"
+					label="CAM ZOOM"
+					labelColor="#34B27B"
+				>
+					{webcamZoomItems.map((item) => (
+						<Item
+							id={item.id}
+							key={item.id}
+							rowId={item.rowId}
+							span={item.span}
+							isSelected={item.id === selectedWebcamZoomId}
+							onSelect={() => onSelectWebcamZoom?.(item.id)}
+							variant="zoom"
+						>
+							{item.label}
+						</Item>
+					))}
+				</Row>
+			)}
+
+			{hasWebcam && (
+				<Row
+					id={WEBCAM_TAKEOVER_ROW_ID}
+					isEmpty={webcamTakeoverItems.length === 0}
+					hint="Press K for Takeover"
+					label="TAKEOVER"
+					labelColor="#a78bfa"
+				>
+					{webcamTakeoverItems.map((item) => (
+						<Item
+							id={item.id}
+							key={item.id}
+							rowId={item.rowId}
+							span={item.span}
+							isSelected={item.id === selectedWebcamTakeoverId}
+							onSelect={() => onSelectWebcamTakeover?.(item.id)}
+							variant="annotation"
+						>
+							{item.label}
+						</Item>
+					))}
+				</Row>
+			)}
 		</div>
 	);
 }
@@ -928,6 +1010,19 @@ export default function TimelineEditor({
 	onGenerateCaptions,
 	isGeneratingCaptions = false,
 	captionsLabel,
+	hasWebcam = false,
+	webcamZoomRegions = [],
+	onWebcamZoomAdded,
+	onWebcamZoomSpanChange,
+	onWebcamZoomDelete,
+	selectedWebcamZoomId,
+	onSelectWebcamZoom,
+	webcamTakeoverRegions = [],
+	onWebcamTakeoverAdded,
+	onWebcamTakeoverSpanChange,
+	onWebcamTakeoverDelete,
+	selectedWebcamTakeoverId,
+	onSelectWebcamTakeover,
 }: TimelineEditorProps) {
 	const t = useScopedT("timeline");
 	const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
@@ -1236,6 +1331,48 @@ export default function TimelineEditor({
 		onBlurAdded({ start: startPos, end: endPos });
 	}, [videoDuration, totalMs, currentTimeMs, onBlurAdded, defaultRegionDurationMs]);
 
+	const handleAddWebcamZoom = useCallback(() => {
+		if (!videoDuration || videoDuration === 0 || totalMs === 0 || !onWebcamZoomAdded) {
+			return;
+		}
+
+		const defaultDuration = Math.min(defaultRegionDurationMs, totalMs);
+		if (defaultDuration <= 0) {
+			return;
+		}
+
+		const startPos = Math.max(0, Math.min(currentTimeMs, totalMs));
+		const endPos = Math.min(startPos + defaultDuration, totalMs);
+		onWebcamZoomAdded({ start: startPos, end: endPos });
+	}, [videoDuration, totalMs, currentTimeMs, onWebcamZoomAdded, defaultRegionDurationMs]);
+
+	const handleAddWebcamTakeover = useCallback(() => {
+		if (!videoDuration || videoDuration === 0 || totalMs === 0 || !onWebcamTakeoverAdded) {
+			return;
+		}
+
+		const defaultDuration = Math.min(defaultRegionDurationMs, totalMs);
+		if (defaultDuration <= 0) {
+			return;
+		}
+
+		const startPos = Math.max(0, Math.min(currentTimeMs, totalMs));
+		const endPos = Math.min(startPos + defaultDuration, totalMs);
+		onWebcamTakeoverAdded({ start: startPos, end: endPos });
+	}, [videoDuration, totalMs, currentTimeMs, onWebcamTakeoverAdded, defaultRegionDurationMs]);
+
+	const deleteSelectedWebcamZoom = useCallback(() => {
+		if (!selectedWebcamZoomId || !onWebcamZoomDelete || !onSelectWebcamZoom) return;
+		onWebcamZoomDelete(selectedWebcamZoomId);
+		onSelectWebcamZoom(null);
+	}, [selectedWebcamZoomId, onWebcamZoomDelete, onSelectWebcamZoom]);
+
+	const deleteSelectedWebcamTakeover = useCallback(() => {
+		if (!selectedWebcamTakeoverId || !onWebcamTakeoverDelete || !onSelectWebcamTakeover) return;
+		onWebcamTakeoverDelete(selectedWebcamTakeoverId);
+		onSelectWebcamTakeover(null);
+	}, [selectedWebcamTakeoverId, onWebcamTakeoverDelete, onSelectWebcamTakeover]);
+
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -1259,6 +1396,12 @@ export default function TimelineEditor({
 			}
 			if (matchesShortcut(e, keyShortcuts.addSpeed, isMac)) {
 				handleAddSpeed();
+			}
+			if (hasWebcam && matchesShortcut(e, keyShortcuts.addWebcamZoom, isMac)) {
+				handleAddWebcamZoom();
+			}
+			if (hasWebcam && matchesShortcut(e, keyShortcuts.addWebcamTakeover, isMac)) {
+				handleAddWebcamTakeover();
 			}
 
 			// Tab cycles through overlapping annotations at the current time
@@ -1300,6 +1443,10 @@ export default function TimelineEditor({
 					deleteSelectedBlur();
 				} else if (selectedSpeedId) {
 					deleteSelectedSpeed();
+				} else if (selectedWebcamZoomId) {
+					deleteSelectedWebcamZoom();
+				} else if (selectedWebcamTakeoverId) {
+					deleteSelectedWebcamTakeover();
 				}
 			}
 		};
@@ -1312,23 +1459,30 @@ export default function TimelineEditor({
 		handleAddAnnotation,
 		handleAddBlur,
 		handleAddSpeed,
+		handleAddWebcamZoom,
+		handleAddWebcamTakeover,
 		deleteSelectedKeyframe,
 		deleteSelectedZoom,
 		deleteSelectedTrim,
 		deleteSelectedAnnotation,
 		deleteSelectedBlur,
 		deleteSelectedSpeed,
+		deleteSelectedWebcamZoom,
+		deleteSelectedWebcamTakeover,
 		selectedKeyframeId,
 		selectedZoomId,
 		selectedTrimId,
 		selectedAnnotationId,
 		selectedBlurId,
 		selectedSpeedId,
+		selectedWebcamZoomId,
+		selectedWebcamTakeoverId,
 		annotationRegions,
 		currentTime,
 		onSelectAnnotation,
 		keyShortcuts,
 		isMac,
+		hasWebcam,
 	]);
 
 	const clampedRange = useMemo<Range>(() => {
@@ -1400,8 +1554,41 @@ export default function TimelineEditor({
 			variant: "speed",
 		}));
 
-		return [...zooms, ...trims, ...annotations, ...blurs, ...speeds];
-	}, [zoomRegions, trimRegions, annotationRegions, blurRegions, speedRegions, t]);
+		const webcamZooms: TimelineRenderItem[] = webcamZoomRegions.map((region, index) => ({
+			id: region.id,
+			rowId: WEBCAM_ZOOM_ROW_ID,
+			span: { start: region.startMs, end: region.endMs },
+			label: `Cam Zoom ${index + 1}`,
+			variant: "webcam-zoom" as const,
+		}));
+
+		const webcamTakeovers: TimelineRenderItem[] = webcamTakeoverRegions.map((region, index) => ({
+			id: region.id,
+			rowId: WEBCAM_TAKEOVER_ROW_ID,
+			span: { start: region.startMs, end: region.endMs },
+			label: `Takeover ${index + 1}`,
+			variant: "webcam-takeover" as const,
+		}));
+
+		return [
+			...zooms,
+			...trims,
+			...annotations,
+			...blurs,
+			...speeds,
+			...webcamZooms,
+			...webcamTakeovers,
+		];
+	}, [
+		zoomRegions,
+		trimRegions,
+		annotationRegions,
+		blurRegions,
+		speedRegions,
+		webcamZoomRegions,
+		webcamTakeoverRegions,
+		t,
+	]);
 
 	// Spans that participate in overlap resolution (clampToNeighbours). Annotation
 	// and blur are excluded since they may overlap and shouldn't constrain a drag.
@@ -1437,6 +1624,10 @@ export default function TimelineEditor({
 				onAnnotationSpanChange?.(id, span);
 			} else if (blurRegions.some((r) => r.id === id)) {
 				onBlurSpanChange?.(id, span);
+			} else if (webcamZoomRegions.some((r) => r.id === id)) {
+				onWebcamZoomSpanChange?.(id, span);
+			} else if (webcamTakeoverRegions.some((r) => r.id === id)) {
+				onWebcamTakeoverSpanChange?.(id, span);
 			}
 		},
 		[
@@ -1445,11 +1636,15 @@ export default function TimelineEditor({
 			speedRegions,
 			annotationRegions,
 			blurRegions,
+			webcamZoomRegions,
+			webcamTakeoverRegions,
 			onZoomSpanChange,
 			onTrimSpanChange,
 			onSpeedSpanChange,
 			onAnnotationSpanChange,
 			onBlurSpanChange,
+			onWebcamZoomSpanChange,
+			onWebcamTakeoverSpanChange,
 		],
 	);
 
@@ -1660,6 +1855,11 @@ export default function TimelineEditor({
 						keyframes={keyframes}
 						videoUrl={videoUrl}
 						showTrimWaveform={showTrimWaveform}
+						hasWebcam={hasWebcam}
+						onSelectWebcamZoom={onSelectWebcamZoom}
+						onSelectWebcamTakeover={onSelectWebcamTakeover}
+						selectedWebcamZoomId={selectedWebcamZoomId}
+						selectedWebcamTakeoverId={selectedWebcamTakeoverId}
 					/>
 				</TimelineWrapper>
 			</div>

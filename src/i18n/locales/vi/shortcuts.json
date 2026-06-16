@@ -23,7 +23,9 @@
 		"addBlur": "Thêm Làm mờ",
 		"addKeyframe": "Thêm Khung hình chính",
 		"deleteSelected": "Xóa mục đã chọn",
-		"playPause": "Phát / Tạm dừng"
+		"playPause": "Phát / Tạm dừng",
+		"addWebcamZoom": "Thêm Thu phóng Cam",
+		"addWebcamTakeover": "Thêm Chuyển giao Cam"
 	},
 	"fixedActions": {
 		"undo": "Hoàn tác",
