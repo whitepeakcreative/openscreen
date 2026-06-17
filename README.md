@@ -11,6 +11,10 @@
 - **Custom Gradient Builder** — Build and apply custom CSS gradients as backgrounds
 - **Keyboard Shortcuts** — `W` for webcam zoom, `K` for webcam takeover
 
+### Download Prebuilt Installers
+
+Prebuilt installers for Windows, macOS (Intel + Apple Silicon), and Linux are available on the [GitHub Releases page](https://github.com/whitepeakcreative/openscreen/releases/tag/v1.5.0).
+
 ---
 
 > [!WARNING]
