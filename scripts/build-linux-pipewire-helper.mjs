@@ -25,7 +25,7 @@ if (pkgCheck.status !== 0) {
 	console.log("WARNING: Required build dependencies not found (glib-2.0, gio-2.0, gstreamer-1.0).");
 	console.log("Install them with:");
 	console.log(
-		"  Ubuntu/Debian: sudo apt-get install -y libglib2.0-dev libgstreamer1.0-dev libgstreamer1.0-plugins-base-dev",
+		"  Ubuntu/Debian: sudo apt-get install -y libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev",
 	);
 	console.log(
 		"  Fedora: sudo dnf install -y glib2-devel gstreamer1-devel gstreamer1-plugins-base-devel",
