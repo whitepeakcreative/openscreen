@@ -112,6 +112,13 @@ interface Window {
 			reason?: "unsupported-platform" | "missing-helper" | string;
 			error?: string;
 		}>;
+		isNativeLinuxCaptureAvailable: () => Promise<{
+			success: boolean;
+			available: boolean;
+			helperPath?: string;
+			reason?: "unsupported-platform" | "missing-helper" | string;
+			error?: string;
+		}>;
 		startNativeWindowsRecording: (
 			request: import("../src/lib/nativeWindowsRecording").NativeWindowsRecordingRequest,
 		) => Promise<import("../src/lib/nativeWindowsRecording").NativeWindowsRecordingStartResult>;
@@ -143,6 +150,17 @@ interface Window {
 			error?: string;
 		}>;
 		stopNativeMacRecording: (discard?: boolean) => Promise<{
+			success: boolean;
+			path?: string;
+			session?: import("../src/lib/recordingSession").RecordingSession;
+			message?: string;
+			discarded?: boolean;
+			error?: string;
+		}>;
+		startNativeLinuxRecording: (
+			request: import("../src/lib/nativeLinuxRecording").NativeLinuxRecordingRequest,
+		) => Promise<import("../src/lib/nativeLinuxRecording").NativeLinuxRecordingStartResult>;
+		stopNativeLinuxRecording: (discard?: boolean) => Promise<{
 			success: boolean;
 			path?: string;
 			session?: import("../src/lib/recordingSession").RecordingSession;

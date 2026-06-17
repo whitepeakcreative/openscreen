@@ -2,6 +2,7 @@ import { fixWebmDuration } from "@fix-webm-duration/fix";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useScopedT } from "@/contexts/I18nContext";
+import { type NativeLinuxRecordingRequest } from "@/lib/nativeLinuxRecording";
 import {
 	type NativeMacRecordingRequest,
 	parseMacDisplayIdFromSourceId,
@@ -87,6 +88,12 @@ type NativeMacRecordingHandle = {
 	paused: boolean;
 };
 
+type NativeLinuxRecordingHandle = {
+	recordingId: number;
+	finalizing: boolean;
+	paused: boolean;
+};
+
 export function useScreenRecorder(): UseScreenRecorderReturn {
 	const t = useScopedT("editor");
 	const [recording, setRecording] = useState(false);
@@ -104,6 +111,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	const webcamRecorder = useRef<RecorderHandle | null>(null);
 	const nativeWindowsRecording = useRef<NativeWindowsRecordingHandle | null>(null);
 	const nativeMacRecording = useRef<NativeMacRecordingHandle | null>(null);
+	const nativeLinuxRecording = useRef<NativeLinuxRecordingHandle | null>(null);
 	const stream = useRef<MediaStream | null>(null);
 	const screenStream = useRef<MediaStream | null>(null);
 	const microphoneStream = useRef<MediaStream | null>(null);
@@ -125,6 +133,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		Boolean(
 			(nativeWindowsRecording.current && !nativeWindowsRecording.current.finalizing) ||
 				(nativeMacRecording.current && !nativeMacRecording.current.finalizing) ||
+				(nativeLinuxRecording.current && !nativeLinuxRecording.current.finalizing) ||
 				(screenRecorder.current && screenRecorder.current.recorder.state !== "inactive"),
 		);
 
@@ -618,6 +627,57 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		[cursorCaptureMode, getRecordingDurationMs],
 	);
 
+	const finalizeNativeLinuxRecording = useCallback(async (discard = false) => {
+		const activeNativeRecording = nativeLinuxRecording.current;
+		if (!activeNativeRecording || activeNativeRecording.finalizing) {
+			return false;
+		}
+
+		activeNativeRecording.finalizing = true;
+
+		const clearNativeRecordingState = () => {
+			nativeLinuxRecording.current = null;
+			setRecording(false);
+			setPaused(false);
+			setElapsedSeconds(0);
+			accumulatedDurationMs.current = 0;
+			segmentStartedAt.current = null;
+		};
+
+		try {
+			const result = await window.electronAPI.stopNativeLinuxRecording(discard);
+			if (discard || result.discarded) {
+				clearNativeRecordingState();
+				return true;
+			}
+			if (!result.success) {
+				console.error("Failed to stop native Linux recording:", result.error);
+				toast.error(result.error ?? "Failed to stop native Linux recording");
+				activeNativeRecording.finalizing = false;
+				return true;
+			}
+
+			clearNativeRecordingState();
+			if (result.session) {
+				await window.electronAPI.setCurrentRecordingSession(result.session);
+			} else if (result.path) {
+				await window.electronAPI.setCurrentVideoPath(result.path);
+			}
+
+			await window.electronAPI.switchToEditor();
+			return true;
+		} catch (error) {
+			console.error("Error saving native Linux recording:", error);
+			toast.error(error instanceof Error ? error.message : "Failed to save native Linux recording");
+			activeNativeRecording.finalizing = false;
+			return true;
+		} finally {
+			if (discardRecordingId.current === activeNativeRecording.recordingId) {
+				discardRecordingId.current = null;
+			}
+		}
+	}, []);
+
 	const stopRecording = useRef(() => {
 		if (nativeWindowsRecording.current) {
 			void finalizeNativeWindowsRecording(false);
@@ -625,6 +685,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		}
 		if (nativeMacRecording.current) {
 			void finalizeNativeMacRecording(false);
+			return;
+		}
+		if (nativeLinuxRecording.current) {
+			void finalizeNativeLinuxRecording(false);
 			return;
 		}
 
@@ -699,6 +763,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			if (nativeMacRecording.current) {
 				void finalizeNativeMacRecording(true);
 			}
+			if (nativeLinuxRecording.current) {
+				void finalizeNativeLinuxRecording(true);
+			}
 
 			if (
 				screenRecorder.current?.recorder.state === "recording" ||
@@ -729,6 +796,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		safeHideCountdownOverlay,
 		finalizeNativeWindowsRecording,
 		finalizeNativeMacRecording,
+		finalizeNativeLinuxRecording,
 	]);
 
 	const safeShowCountdownOverlay = async (value: number, runId: number) => {
@@ -795,6 +863,12 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 				}
 				if (availability.reason === "missing-helper") {
 					console.warn("Native Windows capture helper is not available; using browser capture.");
+					if (cursorCaptureMode === "editable-overlay") {
+						toast.error(t("recording.cursorSuppressionUnavailable"), {
+							description: t("recording.cursorSuppressionUnavailableDescription"),
+							duration: 8000,
+						});
+					}
 					return false;
 				}
 
@@ -1037,6 +1111,87 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 		}
 	};
 
+	const startNativeLinuxRecordingIfAvailable = async (
+		selectedSource: ProcessedDesktopSource,
+		countdownRunToken?: number,
+	) => {
+		try {
+			const platform = await window.electronAPI.getPlatform();
+			if (platform !== "linux") {
+				return false;
+			}
+
+			const availability = await window.electronAPI.isNativeLinuxCaptureAvailable();
+			if (!availability.success || !availability.available) {
+				if (availability.reason === "unsupported-platform") {
+					return false;
+				}
+				if (availability.reason === "missing-helper") {
+					console.warn("Native Linux capture helper is not available; using browser capture.");
+					if (cursorCaptureMode === "editable-overlay") {
+						toast.error(t("recording.cursorSuppressionUnavailable"), {
+							description: t("recording.cursorSuppressionLinuxDescription"),
+							duration: 8000,
+						});
+					}
+					return false;
+				}
+
+				throw new Error(availability.error ?? "Native Linux capture is not available.");
+			}
+
+			if (!isCountdownRunActive(countdownRunToken)) {
+				return true;
+			}
+
+			const activeRecordingId = Date.now();
+			const sourceType = selectedSource.id.startsWith("window:") ? "window" : "display";
+			const displayId = Number(selectedSource.display_id);
+			const request: NativeLinuxRecordingRequest = {
+				recordingId: activeRecordingId,
+				source: {
+					type: sourceType,
+					sourceId: selectedSource.id,
+					...(Number.isFinite(displayId) ? { displayId } : {}),
+				},
+				video: {
+					fps: TARGET_FRAME_RATE,
+					width: TARGET_WIDTH,
+					height: TARGET_HEIGHT,
+				},
+				audio: {
+					system: {
+						enabled: systemAudioEnabled,
+					},
+				},
+				cursor: {
+					mode: cursorCaptureMode,
+				},
+			};
+			const result = await window.electronAPI.startNativeLinuxRecording(request);
+			if (!result.success || !result.recordingId) {
+				throw new Error(result.error ?? "Native Linux capture failed.");
+			}
+
+			recordingId.current = result.recordingId;
+			nativeLinuxRecording.current = {
+				recordingId: result.recordingId,
+				finalizing: false,
+				paused: false,
+			};
+			accumulatedDurationMs.current = 0;
+			segmentStartedAt.current = Date.now();
+			allowAutoFinalize.current = true;
+			setRecording(true);
+			setPaused(false);
+			setElapsedSeconds(0);
+			return true;
+		} catch (error) {
+			console.error("Native Linux capture failed:", error);
+			throw error;
+		}
+	};
+
 	const startRecordCountdown = async () => {
 		if (countdownActive || recording) {
 			return;
@@ -1148,6 +1303,9 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 				return;
 			}
 			if (await startNativeMacRecordingIfAvailable(selectedSource, countdownRunToken)) {
+				return;
+			}
+			if (await startNativeLinuxRecordingIfAvailable(selectedSource, countdownRunToken)) {
 				return;
 			}
 
@@ -1568,6 +1726,18 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			}
 			return;
 		}
+		if (nativeLinuxRecording.current) {
+			const activeRecordingId = recordingId.current;
+			restarting.current = true;
+			discardRecordingId.current = activeRecordingId;
+			try {
+				await finalizeNativeLinuxRecording(true);
+				await startRecording();
+			} finally {
+				restarting.current = false;
+			}
+			return;
+		}
 
 		const activeScreenRecorder = screenRecorder.current;
 		if (!activeScreenRecorder || activeScreenRecorder.recorder.state === "inactive") return;
@@ -1638,6 +1808,13 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			discardRecordingId.current = activeRecordingId;
 			allowAutoFinalize.current = false;
 			void finalizeNativeMacRecording(true);
+			return;
+		}
+		if (nativeLinuxRecording.current) {
+			const activeRecordingId = recordingId.current;
+			discardRecordingId.current = activeRecordingId;
+			allowAutoFinalize.current = false;
+			void finalizeNativeLinuxRecording(true);
 			return;
 		}
 

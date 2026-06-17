@@ -42,7 +42,10 @@
 		"cameraDisconnected": "Webcam disconnected.",
 		"cameraNotFound": "Camera not found.",
 		"permissionDenied": "Recording permission denied. Please allow screen recording.",
-		"accessibilityAllowAndRetry": "Allow Accessibility access for OpenScreen, then press record again to start the countdown."
+		"accessibilityAllowAndRetry": "Allow Accessibility access for OpenScreen, then press record again to start the countdown.",
+		"cursorSuppressionUnavailable": "Native cursor suppression unavailable",
+		"cursorSuppressionUnavailableDescription": "The Windows capture helper is missing. The system cursor will be visible in the recording alongside the custom cursor overlay. Rebuild the app with 'npm run build:win' to include the helper.",
+		"cursorSuppressionLinuxDescription": "The Linux PipeWire capture helper is missing. The system cursor may be visible in the recording on Wayland. Install the helper or use X11 for cursor hiding."
 	},
 	"autoCaptions": {
 		"button": "Auto captions",

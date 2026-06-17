@@ -149,6 +149,8 @@ export class FrameRenderer {
 	private compositeCtx: CanvasRenderingContext2D | null = null;
 	private foregroundCanvas: HTMLCanvasElement | null = null;
 	private foregroundCtx: CanvasRenderingContext2D | null = null;
+	private cursorCanvas: HTMLCanvasElement | null = null;
+	private cursorCtx: CanvasRenderingContext2D | null = null;
 	private rasterCanvas: HTMLCanvasElement | null = null;
 	private rasterCtx: CanvasRenderingContext2D | null = null;
 	private threeDPass: ThreeDPass | null = null;
@@ -243,7 +245,7 @@ export class FrameRenderer {
 			throw new Error("Failed to get 2D context for raster canvas");
 		}
 
-		// Foreground (transparent): recording + shadow + webcam + cursor + annotations.
+		// Foreground (transparent): recording + cursor + webcam + annotations.
 		// The 3D pass operates only on this layer so the wallpaper stays flat behind it.
 		this.foregroundCanvas = document.createElement("canvas");
 		this.foregroundCanvas.width = this.config.width;
@@ -253,6 +255,14 @@ export class FrameRenderer {
 		});
 		if (!this.foregroundCtx) {
 			throw new Error("Failed to get 2D context for foreground canvas");
+		}
+
+		this.cursorCanvas = document.createElement("canvas");
+		this.cursorCanvas.width = this.config.width;
+		this.cursorCanvas.height = this.config.height;
+		this.cursorCtx = this.cursorCanvas.getContext("2d");
+		if (!this.cursorCtx) {
+			throw new Error("Failed to get 2D context for cursor canvas");
 		}
 
 		if (this.config.showShadow) {
@@ -442,12 +452,14 @@ export class FrameRenderer {
 		// Render the PixiJS stage (video only, transparent background)
 		this.app.renderer.render(this.app.stage);
 
+		// Draw the native cursor onto a separate canvas before compositing so it
+		// can be layered between the video and the webcam (behind cam takeover).
+		await this.drawNativeCursor(timeMs);
+
 		// Skip baking the shadow when the rotation pass will run; bilinear sampling would
 		// alias it to a hard edge. Re-applied fresh after rotation.
 		const willRotate = !isRotation3DIdentity(this.currentRotation3D);
 		this.compositeWithShadows(webcamFrame, !willRotate);
-
-		await this.drawNativeCursor(timeMs);
 
 		// Annotations go on top of foreground so they rotate with the recording
 		if (
@@ -546,9 +558,11 @@ export class FrameRenderer {
 	}
 
 	private async drawNativeCursor(timeMs: number) {
-		if (!this.foregroundCtx || !this.layoutCache) {
+		if (!this.cursorCtx || !this.layoutCache) {
 			return;
 		}
+
+		this.cursorCtx.clearRect(0, 0, this.cursorCanvas!.width, this.cursorCanvas!.height);
 
 		if ((this.config.cursorScale ?? 1) <= 0) {
 			resetNativeCursorMotionBlurState(this.nativeCursorMotionBlurState);
@@ -619,31 +633,31 @@ export class FrameRenderer {
 		});
 		// Clip only when explicitly enabled; by default the cursor may overflow the canvas
 		const cursorClip = this.config.cursorClipToBounds === true ? this.cameraAwareMaskRect() : null;
-		this.foregroundCtx.save();
-		this.foregroundCtx.beginPath();
+		this.cursorCtx.save();
+		this.cursorCtx.beginPath();
 		if (cursorClip) {
-			this.foregroundCtx.roundRect(
+			this.cursorCtx.roundRect(
 				cursorClip.x,
 				cursorClip.y,
 				cursorClip.width,
 				cursorClip.height,
 				cursorClip.br,
 			);
-			this.foregroundCtx.clip();
+			this.cursorCtx.clip();
 		}
-		const previousFilter = this.foregroundCtx.filter;
+		const previousFilter = this.cursorCtx.filter;
 		if (blurPx > 0) {
-			this.foregroundCtx.filter = `blur(${blurPx.toFixed(2)}px)`;
+			this.cursorCtx.filter = `blur(${blurPx.toFixed(2)}px)`;
 		}
-		this.foregroundCtx.drawImage(
+		this.cursorCtx.drawImage(
 			image,
 			canvasX - renderAsset.hotspotX * scale * appliedScale * sizeNorm,
 			canvasY - renderAsset.hotspotY * scale * appliedScale * sizeNorm,
 			renderAsset.width * scale * appliedScale * sizeNorm,
 			renderAsset.height * scale * appliedScale * sizeNorm,
 		);
-		this.foregroundCtx.filter = previousFilter;
-		this.foregroundCtx.restore();
+		this.cursorCtx.filter = previousFilter;
+		this.cursorCtx.restore();
 	}
 
 	private async getCursorImage(asset: { id: string; imageDataUrl: string }) {
@@ -1019,6 +1033,12 @@ export class FrameRenderer {
 			fgCtx.drawImage(videoCanvas, 0, 0, w, h);
 		}
 
+		// Draw the native cursor between the video and the webcam so it appears
+		// behind the cam takeover, matching the preview z-order.
+		if (this.cursorCanvas && this.cursorCtx) {
+			fgCtx.drawImage(this.cursorCanvas, 0, 0, w, h);
+		}
+
 		const webcamRect = this.layoutCache?.webcamRect ?? null;
 		const layoutMaskRect = this.layoutCache?.maskRect ?? null;
 		if (webcamFrame && webcamRect) {
@@ -1230,6 +1250,8 @@ export class FrameRenderer {
 		this.compositeCtx = null;
 		this.foregroundCanvas = null;
 		this.foregroundCtx = null;
+		this.cursorCanvas = null;
+		this.cursorCtx = null;
 		this.rasterCanvas = null;
 		this.rasterCtx = null;
 		if (this.threeDPass) {

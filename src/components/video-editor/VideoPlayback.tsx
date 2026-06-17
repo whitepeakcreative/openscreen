@@ -1678,8 +1678,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 									nativeCursorImageIdRef.current = renderAsset.id;
 								}
 								nativeCursorImage.style.display = "block";
-								// Clip to the camera-aware video boundary. Works here because nativeCursorClipRef
-								// sits outside preserve-3d. When cursorClipToBounds is off, let the cursor overflow.
+								// Clip to the camera-aware video boundary. nativeCursorClipRef sits inside
+								// composite3DRef (below the webcam) so the cursor is behind cam takeover.
+								// When cursorClipToBounds is off, let the cursor overflow.
 								if (nativeCursorClipRef.current) {
 									if (!cursorClipToBoundsRef.current) {
 										nativeCursorClipRef.current.style.clipPath = "none";
@@ -1746,9 +1747,6 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 							composite3D.style.willChange = "auto";
 							lastTransformIsIdentity = true;
 						}
-						if (nativeCursorClipRef.current) {
-							nativeCursorClipRef.current.style.transform = "";
-						}
 						if (lastPerspectiveValue !== 0) {
 							outerWrapper.style.perspective = "";
 							lastPerspectiveValue = 0;
@@ -1765,9 +1763,6 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 						);
 						composite3D.style.transform = `scale(${containScale}) rotateX(${effectiveRotation.rotationX}deg) rotateY(${effectiveRotation.rotationY}deg) rotateZ(${effectiveRotation.rotationZ}deg)`;
 						composite3D.style.willChange = "transform";
-						if (nativeCursorClipRef.current) {
-							nativeCursorClipRef.current.style.transform = composite3D.style.transform;
-						}
 						lastTransformIsIdentity = false;
 						if (persp !== lastPerspectiveValue) {
 							outerWrapper.style.perspective = `${persp}px`;
@@ -1970,6 +1965,25 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 									: "none",
 						}}
 					/>
+					{/* Native cursor clip. Lives inside composite3DRef (below the webcam at zIndex 15)
+					    so the custom cursor always renders behind the cam takeover. Bounds are set dynamically. */}
+					<div
+						ref={nativeCursorClipRef}
+						className="absolute inset-0"
+						style={{ zIndex: 15, pointerEvents: "none" }}
+					>
+						<img
+							ref={nativeCursorImageRef}
+							alt=""
+							aria-hidden="true"
+							className="absolute left-0 top-0 select-none"
+							style={{
+								display: "none",
+								pointerEvents: "none",
+								transformOrigin: "0 0",
+							}}
+						/>
+					</div>
 					{webcamVideoPath &&
 						(() => {
 							const clipPath = getCssClipPath(webcamLayout?.maskShape ?? "rectangle");
@@ -2185,25 +2199,6 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 							})()}
 						</div>
 					)}
-				</div>
-				{/* Native cursor clip. Lives outside composite3DRef (preserve-3d) so clip-path
-				    keeps working during 3D zoom rotations; bounds are set dynamically. */}
-				<div
-					ref={nativeCursorClipRef}
-					className="absolute inset-0"
-					style={{ zIndex: 18, pointerEvents: "none" }}
-				>
-					<img
-						ref={nativeCursorImageRef}
-						alt=""
-						aria-hidden="true"
-						className="absolute left-0 top-0 select-none"
-						style={{
-							display: "none",
-							pointerEvents: "none",
-							transformOrigin: "0 0",
-						}}
-					/>
 				</div>
 				<video
 					ref={videoRef}

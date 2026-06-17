@@ -16,6 +16,7 @@ import {
 	shell,
 	systemPreferences,
 } from "electron";
+import type { NativeLinuxRecordingRequest } from "../../src/lib/nativeLinuxRecording";
 import type { NativeMacRecordingRequest } from "../../src/lib/nativeMacRecording";
 import type { NativeWindowsRecordingRequest } from "../../src/lib/nativeWindowsRecording";
 import {
@@ -424,6 +425,16 @@ let nativeMacCursorRecordingStartMs = 0;
 let nativeMacPauseStartedAtMs: number | null = null;
 let nativeMacPauseRanges: Array<{ startMs: number; endMs: number }> = [];
 let nativeMacIsPaused = false;
+let nativeLinuxCaptureProcess: ChildProcessWithoutNullStreams | null = null;
+let nativeLinuxCaptureOutput = "";
+let nativeLinuxCaptureTargetPath: string | null = null;
+let nativeLinuxCaptureRecordingId: number | null = null;
+let nativeLinuxCursorOffsetMs = 0;
+let nativeLinuxCursorCaptureMode: CursorCaptureMode = "editable-overlay";
+let nativeLinuxCursorRecordingStartMs = 0;
+// Accessed by stop handler for cursor offset computation.
+void nativeLinuxCursorRecordingStartMs;
+const NATIVE_LINUX_CAPTURE_STOP_TIMEOUT_MS = 15_000;
 
 function normalizeCursorSample(sample: unknown): CursorRecordingSample | null {
 	if (!sample || typeof sample !== "object") {
@@ -683,6 +694,133 @@ function isWindowsGraphicsCaptureOsSupported() {
 
 	const [, , build] = process.getSystemVersion().split(".").map(Number);
 	return Number.isFinite(build) && build >= 19041;
+}
+
+function getNativeLinuxCaptureHelperCandidates() {
+	const envPath = process.env.OPENSCREEN_PIPEWIRE_CAPTURE_EXE?.trim();
+	return [
+		envPath,
+		resolveUnpackedAppPath("electron", "native", "bin", "linux-x64", "openscreen-pipewire-capture"),
+		resolvePackagedResourcePath(
+			"electron",
+			"native",
+			"bin",
+			"linux-x64",
+			"openscreen-pipewire-capture",
+		),
+	].filter((candidate): candidate is string => Boolean(candidate));
+}
+
+async function findNativeLinuxCaptureHelperPath() {
+	if (process.platform !== "linux") {
+		return null;
+	}
+
+	for (const candidate of getNativeLinuxCaptureHelperCandidates()) {
+		try {
+			await fs.access(candidate, fsConstants.X_OK);
+			return candidate;
+		} catch {
+			// Try the next configured helper location.
+		}
+	}
+
+	return null;
+}
+
+function waitForNativeLinuxCaptureStart(proc: ChildProcessWithoutNullStreams) {
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			cleanup();
+			reject(new Error("Timed out waiting for native Linux capture to start"));
+		}, 30000);
+
+		const onOutput = (chunk: Buffer) => {
+			nativeLinuxCaptureOutput += chunk.toString();
+			if (nativeLinuxCaptureOutput.includes('"recording-started"')) {
+				cleanup();
+				resolve();
+			}
+		};
+		const onError = (error: Error) => {
+			cleanup();
+			reject(error);
+		};
+		const onExit = (code: number | null) => {
+			cleanup();
+			reject(
+				new Error(
+					nativeLinuxCaptureOutput.trim() ||
+						`Native Linux capture exited before recording started (code=${code ?? "unknown"})`,
+				),
+			);
+		};
+		const cleanup = () => {
+			clearTimeout(timer);
+			proc.stdout.off("data", onOutput);
+			proc.stderr.off("data", onOutput);
+			proc.off("error", onError);
+			proc.off("exit", onExit);
+		};
+
+		proc.stdout.on("data", onOutput);
+		proc.stderr.on("data", onOutput);
+		proc.once("error", onError);
+		proc.once("exit", onExit);
+	});
+}
+
+function waitForNativeLinuxCaptureStop(proc: ChildProcessWithoutNullStreams) {
+	return new Promise<string>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			cleanup();
+			if (!proc.killed) {
+				proc.kill();
+			}
+			reject(
+				new Error(
+					`Timed out waiting for native Linux capture to stop. Output: ${nativeLinuxCaptureOutput.trim()}`,
+				),
+			);
+		}, NATIVE_LINUX_CAPTURE_STOP_TIMEOUT_MS);
+		const onOutput = (chunk: Buffer) => {
+			nativeLinuxCaptureOutput += chunk.toString();
+		};
+		const onClose = (code: number | null) => {
+			cleanup();
+			const match = nativeLinuxCaptureOutput.match(/"recording-stopped".*"screenPath":"([^"]+)"/);
+			if (match?.[1]) {
+				resolve(match[1]);
+				return;
+			}
+			if (code === 0 && nativeLinuxCaptureTargetPath) {
+				resolve(nativeLinuxCaptureTargetPath);
+				return;
+			}
+			reject(
+				new Error(
+					nativeLinuxCaptureOutput.trim() ||
+						`Native Linux capture exited with code=${code ?? "unknown"}`,
+				),
+			);
+		};
+		const onError = (error: Error) => {
+			cleanup();
+			reject(error);
+		};
+		const cleanup = () => {
+			clearTimeout(timer);
+			proc.stdout.off("data", onOutput);
+			proc.stderr.off("data", onOutput);
+			proc.off("close", onClose);
+			proc.off("error", onError);
+		};
+
+		proc.stdout.on("data", onOutput);
+		proc.stderr.on("data", onOutput);
+		proc.once("close", onClose);
+		proc.once("error", onError);
+	});
 }
 
 function normalizeNativeDeviceName(value: string) {
@@ -1551,6 +1689,217 @@ export function registerIpcHandlers(
 		return helperPath
 			? { success: true, available: true, helperPath }
 			: { success: true, available: false, reason: "missing-helper" };
+	});
+
+	ipcMain.handle("is-native-linux-capture-available", async () => {
+		if (process.platform !== "linux") {
+			return { success: true, available: false, reason: "unsupported-platform" };
+		}
+
+		const helperPath = await findNativeLinuxCaptureHelperPath();
+		return helperPath
+			? { success: true, available: true, helperPath }
+			: { success: true, available: false, reason: "missing-helper" };
+	});
+
+	ipcMain.handle(
+		"start-native-linux-recording",
+		async (_, request: NativeLinuxRecordingRequest) => {
+			try {
+				if (process.platform !== "linux") {
+					return { success: false, error: "Native Linux capture requires Linux." };
+				}
+				if (nativeLinuxCaptureProcess) {
+					return { success: false, error: "Native Linux capture is already running." };
+				}
+
+				const helperPath = await findNativeLinuxCaptureHelperPath();
+				if (!helperPath) {
+					return { success: false, error: "Native Linux capture helper is not available." };
+				}
+
+				if (!request?.source?.sourceId) {
+					return {
+						success: false,
+						error: "Native Linux capture request is missing a source.",
+					};
+				}
+
+				const recordingId =
+					typeof request.recordingId === "number" && Number.isFinite(request.recordingId)
+						? request.recordingId
+						: Date.now();
+				const outputPath = path.join(RECORDINGS_DIR, `${RECORDING_FILE_PREFIX}${recordingId}.mp4`);
+				const cursorCaptureMode =
+					normalizeCursorCaptureMode(request.cursor?.mode) ?? "editable-overlay";
+				const sourceDisplay = getSelectedDisplay();
+				const bounds = sourceDisplay?.bounds ?? getSelectedSourceBounds();
+				const config = {
+					schemaVersion: 2,
+					recordingId,
+					outputPath,
+					sourceType: request.source.type,
+					sourceId: request.source.sourceId,
+					displayId: request.source.displayId ?? 0,
+					fps: request.video.fps,
+					videoWidth: request.video.width,
+					videoHeight: request.video.height,
+					displayX: bounds.x,
+					displayY: bounds.y,
+					displayW: bounds.width,
+					displayH: bounds.height,
+					captureSystemAudio: request.audio.system.enabled,
+					cursorCaptureMode,
+				};
+
+				console.info("[native-pipewire] starting Linux capture", {
+					helperPath,
+					source: request.source,
+					cursor: { mode: cursorCaptureMode },
+					outputPath,
+				});
+
+				await fs.mkdir(RECORDINGS_DIR, { recursive: true });
+				nativeLinuxCaptureOutput = "";
+				nativeLinuxCaptureTargetPath = outputPath;
+				nativeLinuxCaptureRecordingId = recordingId;
+				nativeLinuxCursorOffsetMs = 0;
+				nativeLinuxCursorCaptureMode = cursorCaptureMode;
+				nativeLinuxCursorRecordingStartMs = 0;
+
+				const cursorStartTimeMs = Date.now();
+				if (cursorCaptureMode === "editable-overlay") {
+					nativeLinuxCursorRecordingStartMs = cursorStartTimeMs;
+					await startCursorRecording(cursorStartTimeMs);
+				} else {
+					pendingCursorRecordingData = null;
+				}
+
+				const proc = spawn(helperPath, [JSON.stringify(config)], {
+					cwd: RECORDINGS_DIR,
+					stdio: ["pipe", "pipe", "pipe"],
+				});
+				nativeLinuxCaptureProcess = proc;
+
+				const drainOutput = (chunk: Buffer) => {
+					nativeLinuxCaptureOutput += chunk.toString();
+					const trimmed = chunk.toString().trim();
+					if (trimmed) {
+						console.info("[native-pipewire]", trimmed);
+					}
+				};
+				proc.stdout.on("data", drainOutput);
+				proc.stderr.on("data", drainOutput);
+				proc.once("exit", (code, signal) => {
+					console.info("[native-pipewire] exited", { code, signal });
+				});
+
+				await waitForNativeLinuxCaptureStart(proc);
+				const captureStartedAtMs = Date.now();
+				nativeLinuxCursorOffsetMs =
+					cursorCaptureMode === "editable-overlay"
+						? Math.max(0, captureStartedAtMs - cursorStartTimeMs)
+						: 0;
+
+				const source = selectedSource || { name: "Screen" };
+				if (onRecordingStateChange) {
+					onRecordingStateChange(true, source.name);
+				}
+
+				return {
+					success: true,
+					recordingId,
+					path: outputPath,
+					helperPath,
+				};
+			} catch (error) {
+				console.error("Failed to start native Linux recording:", error);
+				nativeLinuxCaptureProcess?.kill();
+				nativeLinuxCaptureProcess = null;
+				nativeLinuxCaptureTargetPath = null;
+				nativeLinuxCaptureRecordingId = null;
+				nativeLinuxCursorOffsetMs = 0;
+				nativeLinuxCursorCaptureMode = "editable-overlay";
+				nativeLinuxCursorRecordingStartMs = 0;
+				await stopCursorRecording();
+				return { success: false, error: String(error) };
+			}
+		},
+	);
+
+	ipcMain.handle("stop-native-linux-recording", async (_, discard?: boolean) => {
+		const proc = nativeLinuxCaptureProcess;
+		const preferredPath = nativeLinuxCaptureTargetPath;
+		const recordingId = nativeLinuxCaptureRecordingId ?? Date.now();
+		const cursorCaptureMode = nativeLinuxCursorCaptureMode;
+
+		if (!proc) {
+			return { success: false, error: "Native Linux capture is not running." };
+		}
+
+		try {
+			const stoppedPathPromise = waitForNativeLinuxCaptureStop(proc);
+			proc.stdin.write("stop\n");
+			const stoppedPath = await stoppedPathPromise;
+			const screenVideoPath = stoppedPath || preferredPath;
+			if (!screenVideoPath) {
+				throw new Error("Native Linux capture did not return an output path.");
+			}
+
+			if (cursorCaptureMode === "editable-overlay") {
+				await stopCursorRecording();
+			} else {
+				pendingCursorRecordingData = null;
+			}
+			if (discard) {
+				pendingCursorRecordingData = null;
+				await Promise.all([
+					fs.rm(screenVideoPath, { force: true }),
+					fs.rm(`${screenVideoPath}.cursor.json`, { force: true }),
+				]);
+				return { success: true, discarded: true };
+			}
+
+			if (cursorCaptureMode === "editable-overlay") {
+				shiftPendingCursorTelemetry(nativeLinuxCursorOffsetMs);
+				await writePendingCursorTelemetry(screenVideoPath);
+			}
+			const session: RecordingSession = {
+				screenVideoPath,
+				createdAt: recordingId,
+				cursorCaptureMode,
+			};
+			setCurrentRecordingSessionState(session);
+			currentProjectPath = null;
+
+			const sessionManifestPath = path.join(
+				RECORDINGS_DIR,
+				`${path.parse(screenVideoPath).name}${RECORDING_SESSION_SUFFIX}`,
+			);
+			await fs.writeFile(sessionManifestPath, JSON.stringify(session, null, 2), "utf-8");
+
+			return {
+				success: true,
+				path: screenVideoPath,
+				session,
+				message: "Native Linux recording session stored successfully",
+			};
+		} catch (error) {
+			console.error("Failed to stop native Linux recording:", error);
+			await stopCursorRecording();
+			return { success: false, error: String(error) };
+		} finally {
+			nativeLinuxCaptureProcess = null;
+			nativeLinuxCaptureTargetPath = null;
+			nativeLinuxCaptureRecordingId = null;
+			nativeLinuxCursorOffsetMs = 0;
+			nativeLinuxCursorCaptureMode = "editable-overlay";
+			nativeLinuxCursorRecordingStartMs = 0;
+			const source = selectedSource || { name: "Screen" };
+			if (onRecordingStateChange) {
+				onRecordingStateChange(false, source.name);
+			}
+		}
 	});
 
 	ipcMain.handle(

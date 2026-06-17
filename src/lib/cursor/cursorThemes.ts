@@ -51,10 +51,10 @@ export const CURSOR_THEMES: readonly CursorTheme[] = [
 				hotspotY: 1,
 			},
 			pointer: {
-				assetPath: "cursors/sesh/pointer.png",
+				assetPath: "cursors/sesh/arrow.png",
 				width: 32,
 				height: 32,
-				hotspotX: 8,
+				hotspotX: 1,
 				hotspotY: 1,
 			},
 		},

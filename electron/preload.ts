@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { NativeLinuxRecordingRequest } from "../src/lib/nativeLinuxRecording";
 import type { NativeMacRecordingRequest } from "../src/lib/nativeMacRecording";
 import type { NativeWindowsRecordingRequest } from "../src/lib/nativeWindowsRecording";
 import type { RecordingSession, StoreRecordedSessionInput } from "../src/lib/recordingSession";
@@ -94,6 +95,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	isNativeMacCaptureAvailable: () => {
 		return ipcRenderer.invoke("is-native-mac-capture-available");
 	},
+	isNativeLinuxCaptureAvailable: () => {
+		return ipcRenderer.invoke("is-native-linux-capture-available");
+	},
 	startNativeWindowsRecording: (request: NativeWindowsRecordingRequest) => {
 		return ipcRenderer.invoke("start-native-windows-recording", request);
 	},
@@ -117,6 +121,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 	stopNativeMacRecording: (discard?: boolean) => {
 		return ipcRenderer.invoke("stop-native-mac-recording", discard);
+	},
+	startNativeLinuxRecording: (request: NativeLinuxRecordingRequest) => {
+		return ipcRenderer.invoke("start-native-linux-recording", request);
+	},
+	stopNativeLinuxRecording: (discard?: boolean) => {
+		return ipcRenderer.invoke("stop-native-linux-recording", discard);
 	},
 	attachNativeMacWebcamRecording: (payload: {
 		screenVideoPath: string;
