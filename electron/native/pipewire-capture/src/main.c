@@ -1,6 +1,6 @@
 #include <glib.h>
 #include <gio/gio.h>
-#include <gst/gst/gst.h>
+#include <gst/gst.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
